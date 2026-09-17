@@ -796,7 +796,7 @@ function App() {
           </div>
 
           {/* Workspace Filter Dropdown */}
-          {dbStats && dbStats.workspaces.length > 1 && (
+          {dbStats?.workspaces && dbStats.workspaces.length > 1 && (
             <div className="mt-2 flex items-center space-x-2 text-[11px]">
               <span className={clsx("shrink-0", t.textMuted)}>工作区:</span>
               <select
@@ -808,7 +808,7 @@ function App() {
                 )}
               >
                 <option value="all">全部工作区 ({allSessions.length})</option>
-                {dbStats.workspaces.map(ws => (
+                {dbStats.workspaces?.map(ws => (
                   <option key={ws} value={ws}>
                     {ws.split('/').slice(-2).join('/')}
                   </option>

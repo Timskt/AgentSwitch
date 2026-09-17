@@ -44,20 +44,23 @@ export const TurnOutline: React.FC<TurnOutlineProps> = ({
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'has_tools' | 'has_files'>('all')
 
+  const turnsList = turns || []
   const filteredTurns = useMemo(() => {
-    return turns.filter(turn => {
-      if (filterType === 'has_tools' && turn.tools.length === 0) return false
-      if (filterType === 'has_files' && turn.modifiedFiles.length === 0) return false
+    return turnsList.filter(turn => {
+      const tools = turn.tools || []
+      const files = turn.modifiedFiles || []
+      if (filterType === 'has_tools' && tools.length === 0) return false
+      if (filterType === 'has_files' && files.length === 0) return false
       if (!searchQuery.trim()) return true
       const q = searchQuery.toLowerCase()
       return (
-        turn.summary.toLowerCase().includes(q) ||
-        turn.userText.toLowerCase().includes(q) ||
-        turn.modifiedFiles.some(f => f.toLowerCase().includes(q)) ||
-        turn.tools.some(tool => (tool.name || '').toLowerCase().includes(q))
+        (turn.summary || '').toLowerCase().includes(q) ||
+        (turn.userText || '').toLowerCase().includes(q) ||
+        files.some(f => f.toLowerCase().includes(q)) ||
+        tools.some(tool => (tool?.name || '').toLowerCase().includes(q))
       )
     })
-  }, [turns, searchQuery, filterType])
+  }, [turnsList, searchQuery, filterType])
 
   return (
     <div className={clsx(

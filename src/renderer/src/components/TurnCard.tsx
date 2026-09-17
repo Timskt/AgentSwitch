@@ -28,6 +28,10 @@ export const TurnCard: React.FC<TurnCardProps> = ({
   isFocused = false
 }) => {
   const t = THEME_STYLES[theme]
+  const tools = turn?.tools || []
+  const modifiedFiles = turn?.modifiedFiles || []
+  const subagents = turn?.subagents || []
+
   const [toolsExpanded, setToolsExpanded] = useState(false)
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
   const [copiedPrompt, setCopiedPrompt] = useState(false)
@@ -76,16 +80,16 @@ export const TurnCard: React.FC<TurnCardProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {turn.tools.length > 0 && (
+          {tools.length > 0 && (
             <span className="text-[11px] text-blue-400 font-mono flex items-center gap-1">
               <Wrench className="w-3 h-3" />
-              {turn.tools.length} 次工具
+              {tools.length} 次工具
             </span>
           )}
-          {turn.modifiedFiles.length > 0 && (
+          {modifiedFiles.length > 0 && (
             <span className="text-[11px] text-emerald-400 font-mono flex items-center gap-1">
               <FileCode className="w-3 h-3" />
-              {turn.modifiedFiles.length} 修改
+              {modifiedFiles.length} 修改
             </span>
           )}
           <button
@@ -128,7 +132,7 @@ export const TurnCard: React.FC<TurnCardProps> = ({
       </div>
 
       {/* 2. Execution Traces (Tools, Subagents, Thinking) */}
-      {(turn.tools.length > 0 || turn.thinking || turn.subagents.length > 0) && (
+      {(tools.length > 0 || turn.thinking || subagents.length > 0) && (
         <div className={clsx("px-4 py-2 border-b bg-zinc-500/[0.04] space-y-2", t.border)}>
           {/* Thinking Accordion if exists */}
           {turn.thinking && (
@@ -155,7 +159,7 @@ export const TurnCard: React.FC<TurnCardProps> = ({
           )}
 
           {/* Tools & Subagents Summary Bar */}
-          {(turn.tools.length > 0 || turn.subagents.length > 0) && (
+          {(tools.length > 0 || subagents.length > 0) && (
             <div className={clsx("rounded-xl border overflow-hidden", t.border)}>
               <button
                 onClick={() => setToolsExpanded(!toolsExpanded)}
@@ -167,12 +171,12 @@ export const TurnCard: React.FC<TurnCardProps> = ({
                 <div className="flex items-center gap-2">
                   <Wrench className="w-3.5 h-3.5 text-blue-400" />
                   <span className={clsx(t.textSecondary)}>
-                    执行了 <strong className="text-blue-400">{turn.tools.length}</strong> 次工具调用
-                    {turn.modifiedFiles.length > 0 && (
-                      <> · 修改了 <strong className="text-emerald-400">{turn.modifiedFiles.length}</strong> 个文件</>
+                    执行了 <strong className="text-blue-400">{tools.length}</strong> 次工具调用
+                    {modifiedFiles.length > 0 && (
+                      <> · 修改了 <strong className="text-emerald-400">{modifiedFiles.length}</strong> 个文件</>
                     )}
-                    {turn.subagents.length > 0 && (
-                      <> · 派发了 <strong className="text-purple-400">{turn.subagents.length}</strong> 个子任务 Agent</>
+                    {subagents.length > 0 && (
+                      <> · 派发了 <strong className="text-purple-400">{subagents.length}</strong> 个子任务 Agent</>
                     )}
                   </span>
                 </div>
@@ -186,14 +190,14 @@ export const TurnCard: React.FC<TurnCardProps> = ({
               {toolsExpanded && (
                 <div className={clsx("p-3 border-t space-y-2.5 bg-zinc-950/40", t.border)}>
                   {/* Modified Files Chips */}
-                  {turn.modifiedFiles.length > 0 && (
+                  {modifiedFiles.length > 0 && (
                     <div className="space-y-1">
                       <div className="text-[11px] font-medium text-emerald-400 flex items-center gap-1">
                         <FileCode className="w-3 h-3" />
                         <span>本回合变更的文件：</span>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
-                        {turn.modifiedFiles.map((fp, i) => (
+                        {modifiedFiles.map((fp, i) => (
                           <div 
                             key={i}
                             className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-mono"
@@ -218,7 +222,7 @@ export const TurnCard: React.FC<TurnCardProps> = ({
                       <Terminal className="w-3 h-3" />
                       <span>工具执行细节：</span>
                     </div>
-                    {turn.tools.slice(0, 15).map((tool, idx) => (
+                    {tools.slice(0, 15).map((tool, idx) => (
                       <div 
                         key={idx}
                         className={clsx("p-2 rounded-lg border text-xs font-mono bg-zinc-900/60", t.border)}
@@ -234,9 +238,9 @@ export const TurnCard: React.FC<TurnCardProps> = ({
                         )}
                       </div>
                     ))}
-                    {turn.tools.length > 15 && (
+                    {tools.length > 15 && (
                       <div className="text-center text-[11px] text-zinc-500 py-1">
-                        已省略剩余 {turn.tools.length - 15} 项细分工具调用
+                        已省略剩余 {tools.length - 15} 项细分工具调用
                       </div>
                     )}
                   </div>

@@ -454,14 +454,24 @@ export function getAllEcosystemSessions(agentFilter: string = 'all'): { sessions
     codex: 0,
     opencode: 0
   }
+  const workspacesSet = new Set<string>()
+  let totalMsgCount = 0
   for (const s of list) {
     if (byAgent[s.source] !== undefined) byAgent[s.source]++
+    if (s.workspace) workspacesSet.add(s.workspace)
+    if (s.directory) workspacesSet.add(s.directory)
+    totalMsgCount += s.message_count || s.total_messages || 0
   }
+  const workspaces = Array.from(workspacesSet).filter(Boolean)
 
   return {
     sessions: list,
     stats: {
       total: list.length,
+      totalSessions: list.length,
+      totalMessages: totalMsgCount,
+      dbSize: `${list.length} 个本地会话`,
+      workspaces,
       byAgent
     }
   }

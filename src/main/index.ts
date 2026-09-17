@@ -45,14 +45,29 @@ function createWindow(): void {
     trafficLightPosition: { x: 16, y: 18 }
   })
 
+  mainWindow.webContents.on('console-message', (_, level, message, line, sourceId) => {
+    console.log(`[Renderer Log ${level}]: ${message} (${sourceId}:${line})`)
+  })
+
+  mainWindow.webContents.on('did-fail-load', (_, code, desc, url) => {
+    console.error(`[Renderer Fail Load]: ${code} ${desc} ${url}`)
+  })
+
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow?.setTitle('AgentSwitch - 全生态 Agent 记忆与切换工坊')
+    mainWindow?.show()
   })
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
     mainWindow?.setTitle('AgentSwitch - 全生态 Agent 记忆与切换工坊')
   })
+
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isVisible()) {
+      mainWindow.show()
+    }
+  }, 1000)
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
