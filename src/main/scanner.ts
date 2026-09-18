@@ -210,7 +210,15 @@ export function scanLocalEcosystem(): DetectedEcosystem[] {
     try {
       const idxFile = path.join(codexDir, 'session_index.jsonl')
       if (fs.existsSync(idxFile)) {
-        sessCount = fs.readFileSync(idxFile, 'utf-8').split('\n').filter(Boolean).length
+        const lines = fs.readFileSync(idxFile, 'utf-8').split('\n').filter(Boolean)
+        const uniqueIds = new Set<string>()
+        for (const l of lines) {
+          try {
+            const j = JSON.parse(l)
+            if (j.id) uniqueIds.add(j.id)
+          } catch(e) {}
+        }
+        sessCount = uniqueIds.size
       } else {
         sessCount = fs.readdirSync(codexDir).filter(f => f.endsWith('.sqlite') || f.endsWith('.json')).length
       }
@@ -419,7 +427,7 @@ export function getClaudeSessions(): UnifiedSessionItem[] {
 export function getCodexSessions(): UnifiedSessionItem[] {
   const home = os.homedir()
   const codexDir = path.join(home, '.codex')
-  const sessions: UnifiedSessionItem[] = []
+  const bySession = new Map<string, UnifiedSessionItem>()
   const idxFile = path.join(codexDir, 'session_index.jsonl')
 
   if (fs.existsSync(idxFile)) {
@@ -427,24 +435,34 @@ export function getCodexSessions(): UnifiedSessionItem[] {
     for (const l of lines) {
       try {
         const j = JSON.parse(l)
+        if (!j.id) continue
         const time = j.updated_at ? new Date(j.updated_at).getTime() : Date.now()
-        sessions.push({
-          id: j.id,
-          title: j.thread_name || 'Codex 会话 ' + j.id.slice(0, 8),
-          workspace: '~/.codex',
-          directory: '~/.codex',
-          time_created: time - 3600000,
-          time_updated: time,
-          message_count: 15,
-          total_messages: 15,
-          source: 'codex',
-          sourceName: 'OpenAI Codex',
-          sourceColor: '#10b981'
-        })
+        const existing = bySession.get(j.id)
+        if (!existing) {
+          bySession.set(j.id, {
+            id: j.id,
+            title: j.thread_name || 'Codex 会话 ' + j.id.slice(0, 8),
+            workspace: '~/.codex',
+            directory: '~/.codex',
+            time_created: time - 3600000,
+            time_updated: time,
+            message_count: 15,
+            total_messages: 15,
+            source: 'codex',
+            sourceName: 'OpenAI Codex',
+            sourceColor: '#10b981'
+          })
+        } else {
+          // If a newer update arrives in session_index.jsonl, update title and time_updated
+          if (time >= existing.time_updated) {
+            existing.time_updated = time
+            if (j.thread_name) existing.title = j.thread_name
+          }
+        }
       } catch(e) {}
     }
   }
-  return sessions
+  return Array.from(bySession.values())
 }
 
 /**
@@ -527,8 +545,24 @@ export function getAllEcosystemSessions(agentFilter: string = 'all'): { sessions
     } catch(e) {}
   }
 
+  // Double-lock: Global deduplication by source+id to prevent any duplicate keys or objects
+  const uniqueMap = new Map<string, UnifiedSessionItem>()
+  for (const item of list) {
+    const key = `${item.source}:${item.id}`
+    const existing = uniqueMap.get(key)
+    if (!existing || (item.time_updated || 0) > (existing.time_updated || 0)) {
+      uniqueMap.set(key, item)
+    }
+  }
+  let cleanList = Array.from(uniqueMap.values())
+
+  // Strict isolation filter: ensure only sessions matching the agent filter can be returned
+  if (agentFilter !== 'all') {
+    cleanList = cleanList.filter(s => s.source === agentFilter)
+  }
+
   // Sort by time_updated DESC
-  list.sort((a, b) => (b.time_updated || 0) - (a.time_updated || 0))
+  cleanList.sort((a, b) => (b.time_updated || 0) - (a.time_updated || 0))
 
   const byAgent: Record<string, number> = {
     zcode: 0,
@@ -539,7 +573,7 @@ export function getAllEcosystemSessions(agentFilter: string = 'all'): { sessions
   }
   const workspacesSet = new Set<string>()
   let totalMsgCount = 0
-  for (const s of list) {
+  for (const s of cleanList) {
     if (byAgent[s.source] !== undefined) byAgent[s.source]++
     if (s.workspace) workspacesSet.add(s.workspace)
     if (s.directory) workspacesSet.add(s.directory)
@@ -548,12 +582,12 @@ export function getAllEcosystemSessions(agentFilter: string = 'all'): { sessions
   const workspaces = Array.from(workspacesSet).filter(Boolean)
 
   return {
-    sessions: list,
+    sessions: cleanList,
     stats: {
-      total: list.length,
-      totalSessions: list.length,
+      total: cleanList.length,
+      totalSessions: cleanList.length,
       totalMessages: totalMsgCount,
-      dbSize: `${list.length} 个本地会话`,
+      dbSize: `${cleanList.length} 个本地会话`,
       workspaces,
       byAgent
     }

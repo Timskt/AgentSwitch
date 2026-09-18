@@ -210,14 +210,16 @@ function App() {
   }
 
   const loadSessions = (agentFilter: string = selectedAgentFilter) => {
+    const filter = typeof agentFilter === 'string' ? agentFilter : selectedAgentFilter
     // @ts-ignore
-    window.api.getSessions(agentFilter).then((res: any) => {
+    window.api.getSessions(filter).then((res: any) => {
       if (res.success) {
         const list = res.data.sessions || res.data.rootSessions || []
         setRootSessions(list)
         setAllSessions(list)
         setDbStats(res.data.stats)
-        if (list.length > 0 && (!selectedSessionId || !list.some((s: any) => s.id === selectedSessionId))) {
+        const currentStillValid = list.length > 0 && selectedSessionId && list.some((s: any) => s.id === selectedSessionId && (filter === 'all' || s.source === filter))
+        if (!currentStillValid && list.length > 0) {
           setSelectedSessionId(list[0].id)
           setSelectedSessionSource(list[0].source || 'zcode')
         }
@@ -371,11 +373,16 @@ function App() {
   const filteredSessions = useMemo(() => {
     let list: ZSession[] = []
     if (filterMode === 'all') {
-      list = allSessions
+      list = [...allSessions]
     } else if (filterMode === 'with_subagents') {
       list = rootSessions.filter(s => (s.child_count || 0) > 0)
     } else {
-      list = rootSessions
+      list = [...rootSessions]
+    }
+
+    // Strict front-end ecosystem isolation filter
+    if (selectedAgentFilter !== 'all') {
+      list = list.filter(s => (s as any).source === selectedAgentFilter)
     }
 
     if (workspaceFilter !== 'all') {
@@ -407,7 +414,7 @@ function App() {
       }
       return b.time_updated - a.time_updated
     })
-  }, [rootSessions, allSessions, filterMode, workspaceFilter, searchQuery, pinnedIds, sortBy])
+  }, [rootSessions, allSessions, filterMode, selectedAgentFilter, workspaceFilter, searchQuery, pinnedIds, sortBy])
 
   const currentSessionMeta = useMemo(() => {
     return allSessions.find(s => s.id === selectedSessionId) || transcriptData?.meta
@@ -868,9 +875,10 @@ function App() {
               const isChecked = selectedBatchIds.has(s.id)
               const hasChildren = (s.children && s.children.length > 0) || (s.child_count || 0) > 0
               const isExpanded = expandedParents[s.id]
+              const sessionKey = `${(s as any).source || 'zcode'}_${s.id}`
 
               return (
-                <div key={s.id} className="space-y-1">
+                <div key={sessionKey} className="space-y-1">
                   <div
                     onClick={() => {
                       setSelectedSessionId(s.id);
@@ -979,7 +987,7 @@ function App() {
                     <div className={clsx("pl-4 pr-1 py-1 space-y-1 border-l ml-4", t.border)}>
                       {s.children.map(child => (
                         <div
-                          key={child.id}
+                          key={`${(child as any).source || (s as any).source || 'zcode'}_${child.id}`}
                           onClick={() => {
                             setSelectedSessionId(child.id)
                             setSelectedSessionSource((child as any).source || 'zcode')

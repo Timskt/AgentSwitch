@@ -164,9 +164,10 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  ipcMain.handle('get-sessions', (_, args?: { agentFilter?: string }) => {
+  ipcMain.handle('get-sessions', (_, args?: any) => {
     try {
-      const data = getAllEcosystemSessions(args?.agentFilter || 'all')
+      const filter = typeof args === 'string' ? args : (args?.agentFilter || 'all')
+      const data = getAllEcosystemSessions(filter)
       return { success: true, data }
     } catch (e) {
       return { success: false, error: String(e) }
