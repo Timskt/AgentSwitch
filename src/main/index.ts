@@ -20,9 +20,11 @@ import {
 } from './scanner'
 import fs from 'fs'
 import path from 'path'
+import os from 'os'
 
-// Set process name early so macOS Activity Monitor & Dock show AgentSwitch
+// Set process and app name early so macOS Activity Monitor, Dock & WindowServer show AgentSwitch
 app.setName('AgentSwitch')
+process.title = 'AgentSwitch'
 
 function setupAppMenu(): void {
   const isMac = process.platform === 'darwin'
@@ -357,14 +359,68 @@ app.whenReady().then(() => {
     }
   })
 
-  ipcMain.handle('open-in-folder', (_, filePath) => {
-    shell.showItemInFolder(filePath)
-    return { success: true }
+  ipcMain.handle('open-in-folder', async (_, rawPath) => {
+    if (!rawPath || typeof rawPath !== 'string') return { success: false }
+    try {
+      let clean = rawPath.trim()
+      if (clean.startsWith('file://')) {
+        clean = decodeURIComponent(clean.replace(/^file:\/\//, ''))
+      }
+      clean = clean.split('#')[0].split('?')[0]
+      if (clean.startsWith('~')) {
+        clean = path.join(os.homedir(), clean.slice(1))
+      }
+      clean = path.resolve(clean)
+
+      if (fs.existsSync(clean)) {
+        shell.showItemInFolder(clean)
+        return { success: true }
+      } else {
+        const parent = path.dirname(clean)
+        if (fs.existsSync(parent)) {
+          shell.showItemInFolder(parent)
+          return { success: true }
+        }
+      }
+    } catch (err) {
+      console.warn('open-in-folder error:', err)
+    }
+    return { success: false }
   })
 
-  ipcMain.handle('open-external-url', (_, url) => {
-    if (url && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('file://'))) {
-      shell.openExternal(url)
+  ipcMain.handle('open-external-url', async (_, rawUrl) => {
+    if (!rawUrl || typeof rawUrl !== 'string') return { success: false }
+    try {
+      let target = rawUrl.trim()
+      if (target.startsWith('file://')) {
+        let clean = decodeURIComponent(target.replace(/^file:\/\//, ''))
+        clean = clean.split('#')[0].split('?')[0]
+        if (clean.startsWith('~')) clean = path.join(os.homedir(), clean.slice(1))
+        clean = path.resolve(clean)
+
+        if (fs.existsSync(clean)) {
+          const err = await shell.openPath(clean)
+          if (err) {
+            shell.showItemInFolder(clean)
+          }
+          return { success: true }
+        }
+      }
+
+      if (target.startsWith('http://') || target.startsWith('https://')) {
+        await shell.openExternal(target)
+        return { success: true }
+      }
+
+      let clean = target.split('#')[0].split('?')[0]
+      if (clean.startsWith('~')) clean = path.join(os.homedir(), clean.slice(1))
+      if (clean.startsWith('/') && fs.existsSync(clean)) {
+        const err = await shell.openPath(clean)
+        if (err) shell.showItemInFolder(clean)
+        return { success: true }
+      }
+    } catch (err) {
+      console.warn('open-external-url error:', err)
     }
     return { success: true }
   })

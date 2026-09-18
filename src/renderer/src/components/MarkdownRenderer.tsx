@@ -11,12 +11,19 @@ interface MarkdownRendererProps {
   onOpenFullscreen?: (code: string, lang: string) => void
   maxCollapseLines?: number
   theme?: any
+  workspacePath?: string
   onOpenInFolder?: (path: string) => void
   onFullScreenCode?: (code: string, language: string) => void
   onImageClick?: (src: string) => void
 }
 
-export function MarkdownRenderer({ content, onOpenFullscreen, maxCollapseLines = 25, onFullScreenCode }: MarkdownRendererProps) {
+export function MarkdownRenderer({ 
+  content, 
+  onOpenFullscreen, 
+  maxCollapseLines = 25, 
+  onFullScreenCode,
+  workspacePath
+}: MarkdownRendererProps) {
   const [lightboxImage, setLightboxImage] = useState<{ src: string, alt: string } | null>(null)
 
   if (!content) return null
@@ -64,7 +71,14 @@ export function MarkdownRenderer({ content, onOpenFullscreen, maxCollapseLines =
         }
 
         // Render Markdown prose & rich media
-        return <ProseBlock key={bIdx} text={block} onOpenImage={(src, alt) => setLightboxImage({ src, alt })} />
+        return (
+          <ProseBlock 
+            key={bIdx} 
+            text={block} 
+            workspacePath={workspacePath}
+            onOpenImage={(src, alt) => setLightboxImage({ src, alt })} 
+          />
+        )
       })}
     </div>
   )
@@ -155,7 +169,15 @@ function CodeBlock({ rawBlock, maxCollapseLines, onOpenFullscreen }: { rawBlock:
   )
 }
 
-function ProseBlock({ text, onOpenImage }: { text: string, onOpenImage: (src: string, alt: string) => void }) {
+function ProseBlock({ 
+  text, 
+  workspacePath,
+  onOpenImage 
+}: { 
+  text: string, 
+  workspacePath?: string,
+  onOpenImage: (src: string, alt: string) => void 
+}) {
   if (!text.trim()) return null
   const paragraphs = text.split('\n\n')
 
@@ -210,9 +232,11 @@ function ProseBlock({ text, onOpenImage }: { text: string, onOpenImage: (src: st
           return <h3 key={pIdx} className="text-xs font-bold text-zinc-300 mt-1.5 mb-0.5">{trimmed.slice(4)}</h3>
         }
 
-        // 3. Markdown Tables (| a | b |)
-        if (trimmed.includes('|') && trimmed.split('\n').length >= 2 && trimmed.includes('|-')) {
-          return <TableBlock key={pIdx} rawTable={trimmed} />
+        // 3. Markdown Tables (| a | b |) including line-numbered tables (51: | ... |)
+        const rawLines = trimmed.split('\n').map(l => l.trim())
+        const cleanedLines = rawLines.map(l => l.replace(/^\s*\d+:\s*\|/, '|').replace(/^x\s*\|/, '|'))
+        if (cleanedLines.length >= 2 && cleanedLines.filter(l => l.startsWith('|') && l.endsWith('|')).length >= 2) {
+          return <TableBlock key={pIdx} rawTable={trimmed} workspacePath={workspacePath} />
         }
 
         // 4. Blockquotes
@@ -231,7 +255,7 @@ function ProseBlock({ text, onOpenImage }: { text: string, onOpenImage: (src: st
             <ul key={pIdx} className="space-y-1 pl-4 list-disc text-zinc-300">
               {items.map((it, itIdx) => (
                 <li key={itIdx} className="leading-relaxed">
-                  <InlineMarkdown text={it.replace(/^[-*]\s+/, '')} />
+                  <InlineMarkdown text={it.replace(/^[-*]\s+/, '')} workspacePath={workspacePath} />
                 </li>
               ))}
             </ul>
@@ -245,7 +269,7 @@ function ProseBlock({ text, onOpenImage }: { text: string, onOpenImage: (src: st
             <ol key={pIdx} className="space-y-1 pl-4 list-decimal text-zinc-300">
               {items.map((it, itIdx) => (
                 <li key={itIdx} className="leading-relaxed">
-                  <InlineMarkdown text={it.replace(/^\d+\.\s+/, '')} />
+                  <InlineMarkdown text={it.replace(/^\d+\.\s+/, '')} workspacePath={workspacePath} />
                 </li>
               ))}
             </ol>
@@ -255,7 +279,7 @@ function ProseBlock({ text, onOpenImage }: { text: string, onOpenImage: (src: st
         // 7. Regular Paragraph with inline formatting
         return (
           <p key={pIdx} className="leading-relaxed whitespace-pre-wrap break-words text-zinc-200">
-            <InlineMarkdown text={trimmed} />
+            <InlineMarkdown text={trimmed} workspacePath={workspacePath} />
           </p>
         )
       })}
@@ -263,21 +287,27 @@ function ProseBlock({ text, onOpenImage }: { text: string, onOpenImage: (src: st
   )
 }
 
-function TableBlock({ rawTable }: { rawTable: string }) {
-  const lines = rawTable.trim().split('\n').map(l => l.trim()).filter(Boolean)
-  if (lines.length < 2) return <pre>{rawTable}</pre>
+function TableBlock({ rawTable, workspacePath }: { rawTable: string, workspacePath?: string }) {
+  const rawLines = rawTable.trim().split('\n').map(l => l.trim()).filter(Boolean)
+  const lines = rawLines.map(l => l.replace(/^\s*\d+:\s*\|/, '|').replace(/^x\s*\|/, '|'))
+  if (lines.length < 2) return <pre className="p-2 text-[11px] font-mono text-zinc-400 bg-zinc-900 rounded">{rawTable}</pre>
 
-  const headerLine = lines[0]
-  const headers = headerLine.split('|').slice(1, -1).map(h => h.trim())
-  const rowLines = lines.slice(2) // Skip separator line
+  const firstLine = lines[0]
+  const headers = firstLine.split('|').slice(1, -1).map(h => h.trim())
+  let rowLines = lines.slice(1)
+  if (rowLines[0] && rowLines[0].includes('|-')) {
+    rowLines = rowLines.slice(1)
+  }
 
   return (
-    <div className="my-2.5 overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/50 custom-scrollbar">
+    <div className="my-2.5 overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900/50 custom-scrollbar shadow-xs">
       <table className="w-full text-left border-collapse text-[11px]">
         <thead>
           <tr className="border-b border-zinc-800 bg-zinc-900/90 text-zinc-300 font-semibold">
             {headers.map((h, idx) => (
-              <th key={idx} className="px-3 py-2 border-r border-zinc-800/60 last:border-0">{h}</th>
+              <th key={idx} className="px-3 py-2 border-r border-zinc-800/60 last:border-0 font-medium tracking-tight">
+                <InlineMarkdown text={h} workspacePath={workspacePath} />
+              </th>
             ))}
           </tr>
         </thead>
@@ -285,10 +315,10 @@ function TableBlock({ rawTable }: { rawTable: string }) {
           {rowLines.map((row, rIdx) => {
             const cols = row.split('|').slice(1, -1).map(c => c.trim())
             return (
-              <tr key={rIdx} className={clsx("border-b border-zinc-800/40 last:border-0", rIdx % 2 === 0 ? "bg-transparent" : "bg-zinc-900/20")}>
+              <tr key={rIdx} className={clsx("border-b border-zinc-800/40 last:border-0 hover:bg-zinc-800/30 transition-colors", rIdx % 2 === 0 ? "bg-transparent" : "bg-zinc-900/20")}>
                 {cols.map((col, cIdx) => (
                   <td key={cIdx} className="px-3 py-1.5 text-zinc-300 border-r border-zinc-800/40 last:border-0">
-                    <InlineMarkdown text={col} />
+                    <InlineMarkdown text={col} workspacePath={workspacePath} />
                   </td>
                 ))}
               </tr>
@@ -300,28 +330,43 @@ function TableBlock({ rawTable }: { rawTable: string }) {
   )
 }
 
-function InlineMarkdown({ text }: { text: string }) {
+function InlineMarkdown({ text, workspacePath }: { text: string, workspacePath?: string }) {
   // Matches:
   // 1. [link text](url)
-  // 2. Absolute file paths (e.g. /Users/.../*.ext)
+  // 2. Absolute file paths
   // 3. `inline code`
   // 4. **bold**
-  const tokenRegex = /(\[[^\]]+\]\([^)]+\)|\/[a-zA-Z0-9_\-./]+\.[a-zA-Z0-9_]+|`[^`]+`|\*\*[^*]+\*\*)/g
+  const tokenRegex = /(\[[^\]]+\]\([^)]+\)|\/(?:Users|home|[a-zA-Z0-9_\-\.]+)\/[a-zA-Z0-9_\-\.\/]+\.[a-zA-Z0-9_]+|`[^`]+`|\*\*[^*]+\*\*)/g
   const parts = text.split(tokenRegex)
 
   const handleOpenUrl = (url: string) => {
+    let target = url.trim()
+    if (target.startsWith('file://')) {
+      const clean = decodeURIComponent(target.replace(/^file:\/\//, '').split('#')[0])
+      // @ts-ignore
+      if (window.api && window.api.openInFolder) {
+        // @ts-ignore
+        window.api.openInFolder(clean)
+        return
+      }
+    }
     // @ts-ignore
     if (window.api && window.api.openExternalUrl) {
       // @ts-ignore
-      window.api.openExternalUrl(url)
+      window.api.openExternalUrl(target)
     }
   }
 
-  const handleOpenFolder = (filePath: string) => {
+  const handleOpenPath = (filePath: string) => {
+    let target = filePath.trim().replace(/^[`'"]+|[`'"]+$/g, '')
+    target = target.split('#')[0]
+    if (!target.startsWith('/') && !target.startsWith('~') && workspacePath) {
+      target = workspacePath.replace(/\/$/, '') + '/' + target.replace(/^\.\//, '')
+    }
     // @ts-ignore
     if (window.api && window.api.openInFolder) {
       // @ts-ignore
-      window.api.openInFolder(filePath)
+      window.api.openInFolder(target)
     }
   }
 
@@ -338,42 +383,70 @@ function InlineMarkdown({ text }: { text: string }) {
           return (
             <button
               key={idx}
+              type="button"
               onClick={() => handleOpenUrl(url)}
-              className="inline-flex items-center space-x-0.5 text-indigo-400 hover:text-indigo-300 underline font-medium cursor-pointer transition-colors"
+              className="inline-flex items-center space-x-0.5 text-indigo-400 hover:text-indigo-300 underline underline-offset-2 font-medium cursor-pointer transition-colors"
+              title={`打开: ${url}`}
             >
               <span>{title}</span>
-              <ExternalLink className="w-2.5 h-2.5 ml-0.5" />
+              <ExternalLink className="w-2.5 h-2.5 ml-0.5 shrink-0 inline" />
             </button>
           )
         }
 
-        // 2. File path chip
+        // 2. Absolute file path
         if (seg.startsWith('/') && seg.includes('.') && seg.length > 5 && !seg.includes(' ')) {
           const filename = seg.split('/').pop() || seg
           return (
-            <span 
+            <button 
               key={idx} 
-              className="inline-flex items-center space-x-1 px-1.5 py-0.5 mx-0.5 bg-zinc-900 border border-zinc-800 rounded font-mono text-[10.5px] text-zinc-300 shadow-sm"
-              title={seg}
+              type="button"
+              onClick={() => handleOpenPath(seg)}
+              className="inline-flex items-center space-x-1 px-1.5 py-0.5 mx-0.5 bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-700/60 hover:border-indigo-500/60 rounded font-mono text-[10.5px] text-zinc-300 hover:text-white shadow-2xs transition-colors cursor-pointer group"
+              title={`在访达中定位: ${seg}`}
             >
               <FileText className="w-3 h-3 text-indigo-400 shrink-0" />
-              <span className="truncate max-w-[180px]">{filename}</span>
-              <button 
-                onClick={() => handleOpenFolder(seg)}
-                className="text-zinc-500 hover:text-zinc-200 ml-1 p-0.5"
-                title="在访达中显示所在文件夹"
-              >
-                <FolderOpen className="w-2.5 h-2.5" />
-              </button>
-            </span>
+              <span className="truncate max-w-[200px]">{filename}</span>
+              <FolderOpen className="w-2.5 h-2.5 text-zinc-500 group-hover:text-indigo-300 shrink-0 ml-0.5" />
+            </button>
           )
         }
 
         // 3. Inline code
         if (seg.startsWith('`') && seg.endsWith('`') && seg.length > 2) {
+          const code = seg.slice(1, -1).trim()
+          const isPathLike = (
+            (code.includes('/') || /\.(tsx|ts|jsx|js|mjs|cjs|json|md|sql|html|css|py|rs|go|yaml|yml|sh|env)$/i.test(code)) &&
+            !code.includes(' ') &&
+            !code.includes('&&') &&
+            !code.includes('||') &&
+            !code.includes(';') &&
+            code.length > 1
+          )
+
+          if (isPathLike) {
+            const isDir = code.endsWith('/')
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => handleOpenPath(code)}
+                className="inline-flex items-center space-x-1 px-1.5 py-0.5 mx-0.5 bg-zinc-800/60 hover:bg-indigo-950/40 border border-zinc-700/60 hover:border-indigo-500/50 rounded font-mono text-[10.5px] text-zinc-200 hover:text-indigo-200 transition-colors cursor-pointer group"
+                title={`点击定位文件/目录: ${code}`}
+              >
+                {isDir ? (
+                  <FolderOpen className="w-2.5 h-2.5 text-amber-400/80 group-hover:text-amber-300 shrink-0" />
+                ) : (
+                  <FileCode className="w-2.5 h-2.5 text-indigo-400/80 group-hover:text-indigo-300 shrink-0" />
+                )}
+                <span className="truncate max-w-[240px]">{code}</span>
+              </button>
+            )
+          }
+
           return (
-            <code key={idx} className="px-1.5 py-0.5 mx-0.5 bg-zinc-800 text-zinc-200 rounded font-mono text-[10.5px] border border-zinc-700/60">
-              {seg.slice(1, -1)}
+            <code key={idx} className="px-1 py-0.5 mx-0.5 rounded font-mono text-[11px] bg-zinc-800/40 text-zinc-300 font-normal border border-zinc-700/30">
+              {code}
             </code>
           )
         }

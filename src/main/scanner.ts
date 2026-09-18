@@ -38,6 +38,19 @@ export interface UnifiedSessionItem extends ZSession {
   sourceColor: string
 }
 
+export function getOpenCodeDbPath(): string | null {
+  const home = os.homedir()
+  const candidates = [
+    path.join(home, '.local/share/opencode/opencode.db'),
+    path.join(home, '.opencode/opencode.db'),
+    path.join(home, '.config/opencode/opencode.db')
+  ]
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c
+  }
+  return null
+}
+
 export function scanLocalEcosystem(): DetectedEcosystem[] {
   const home = os.homedir()
   const results: DetectedEcosystem[] = []
@@ -228,20 +241,30 @@ export function scanLocalEcosystem(): DetectedEcosystem[] {
   }
 
   // 5. OpenCode
+  const opencodeDb = getOpenCodeDbPath()
   const opencodeDir = path.join(home, '.opencode')
   const opencodeConfig = path.join(home, '.config/opencode')
-  const opencodeFound = fs.existsSync(opencodeDir) || fs.existsSync(opencodeConfig)
+  const opencodeFound = !!opencodeDb || fs.existsSync(opencodeDir) || fs.existsSync(opencodeConfig)
   if (opencodeFound) {
-    const target = fs.existsSync(opencodeDir) ? opencodeDir : opencodeConfig
+    let sessCount = 0
+    if (opencodeDb) {
+      try {
+        const db = new Database(opencodeDb, { readonly: true })
+        const row = db.prepare('SELECT COUNT(*) as c FROM session WHERE parent_id IS NULL').get() as { c: number }
+        sessCount = row?.c || 0
+        db.close()
+      } catch (e) {}
+    }
+    const target = opencodeDb || (fs.existsSync(opencodeDir) ? opencodeDir : opencodeConfig)
     results.push({
       id: 'opencode',
       name: 'OpenCode CLI',
       cliName: 'opencode',
       formatExt: '.opencode.json',
       status: 'active',
-      sessionCount: 12,
+      sessionCount: sessCount,
       path: target,
-      description: '已检测到官方 OpenCode CLI 工作区环境',
+      description: '已检测到官方 OpenCode CLI 工作区环境与数据库',
       color: '#38bdf8'
     })
   } else {
@@ -289,6 +312,7 @@ export function getAntigravitySessions(): UnifiedSessionItem[] {
     if (!fs.existsSync(tp)) continue
     let title = d
     let firstUser = ''
+    let detectedWorkspace = ''
     const stats = fs.statSync(tp)
     const time = stats.mtimeMs
 
@@ -302,18 +326,32 @@ export function getAntigravitySessions(): UnifiedSessionItem[] {
       for (const l of lines) {
         try {
           const j = JSON.parse(l)
-          if (j.type === 'USER_INPUT' && j.content) {
+          if (!firstUser && j.type === 'USER_INPUT' && j.content) {
             firstUser = j.content.slice(0, 60).replace(/[\r\n\t]+/g, ' ')
-            break
           }
+          if (!detectedWorkspace && j.tool_calls) {
+            for (const tc of j.tool_calls) {
+              const a = tc.args || tc.parameters || {}
+              const p = a.DirectoryPath || a.Cwd || a.SearchDirectory || a.SearchPath || a.TargetFile || a.AbsolutePath
+              if (p && typeof p === 'string') {
+                const cleaned = p.replace(/^"|"$/g, '')
+                if (!cleaned.includes('.gemini/antigravity')) {
+                  detectedWorkspace = fs.existsSync(cleaned) && fs.statSync(cleaned).isFile() ? path.dirname(cleaned) : cleaned
+                  break
+                }
+              }
+            }
+          }
+          if (firstUser && detectedWorkspace) break
         } catch(e) {}
       }
       if (!title || title === d) title = firstUser || d
+      const realWorkspace = detectedWorkspace || path.join(agyDir, d)
       sessions.push({
         id: d,
         title,
-        workspace: path.join(agyDir, d),
-        directory: path.join(agyDir, d),
+        workspace: realWorkspace,
+        directory: realWorkspace,
         time_created: time - (lines.length * 60000),
         time_updated: time,
         message_count: lines.length,
@@ -410,6 +448,44 @@ export function getCodexSessions(): UnifiedSessionItem[] {
 }
 
 /**
+ * Reads OpenCode CLI sessions from ~/.local/share/opencode/opencode.db or ~/.opencode/opencode.db
+ */
+export function getOpenCodeSessions(): UnifiedSessionItem[] {
+  const dbPath = getOpenCodeDbPath()
+  if (!dbPath) return []
+
+  try {
+    const db = new Database(dbPath, { readonly: true })
+    const rows = db.prepare(`
+      SELECT s.id, s.title, s.directory, s.time_created, s.time_updated,
+             (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id) as msg_count
+      FROM session s
+      WHERE s.parent_id IS NULL
+      ORDER BY s.time_updated DESC
+    `).all() as any[]
+
+    db.close()
+
+    return rows.map(r => ({
+      id: r.id,
+      title: r.title || ('OpenCode 会话 ' + r.id.slice(0, 8)),
+      workspace: r.directory || '~',
+      directory: r.directory || '~',
+      time_created: r.time_created || Date.now(),
+      time_updated: r.time_updated || Date.now(),
+      message_count: r.msg_count || 0,
+      total_messages: r.msg_count || 0,
+      source: 'opencode' as const,
+      sourceName: 'OpenCode',
+      sourceColor: '#38bdf8'
+    }))
+  } catch (err) {
+    console.warn('Failed to read OpenCode sessions:', err)
+    return []
+  }
+}
+
+/**
  * Aggregates all sessions across all installed local ecosystems
  */
 export function getAllEcosystemSessions(agentFilter: string = 'all'): { sessions: UnifiedSessionItem[], stats: any } {
@@ -442,6 +518,13 @@ export function getAllEcosystemSessions(agentFilter: string = 'all'): { sessions
   // 4. Codex
   if (agentFilter === 'all' || agentFilter === 'codex') {
     list.push(...getCodexSessions())
+  }
+
+  // 5. OpenCode
+  if (agentFilter === 'all' || agentFilter === 'opencode') {
+    try {
+      list.push(...getOpenCodeSessions())
+    } catch(e) {}
   }
 
   // Sort by time_updated DESC
@@ -581,47 +664,100 @@ export function getUnifiedSessionTranscript(
     const modifiedFiles = new Set<string>()
     const readFiles = new Set<string>()
     const toolStats: Record<string, number> = {}
+    let detectedWorkspace = ''
+    let pendingTools: any[] = []
 
     let step = 1
     for (const l of lines) {
       try {
         const item = JSON.parse(l)
-        const isUser = item.type === 'USER_INPUT'
-        const tools = (item.tool_calls || []).map((t: any) => {
-          const tName = t.toolName || t.name || 'tool'
-          toolStats[tName] = (toolStats[tName] || 0) + 1
-          const inp = t.args || t.parameters || {}
-          const fPath = inp.file_path || inp.filePath || inp.path || inp.TargetFile
-          if (fPath && typeof fPath === 'string') {
-            if (['replace_file_content', 'write_to_file', 'Edit', 'Write'].includes(tName)) modifiedFiles.add(fPath)
-            else if (['view_file', 'Read'].includes(tName)) readFiles.add(fPath)
+        if (item.type === 'USER_INPUT') {
+          if (pendingTools.length > 0 && messages.length > 0) {
+            const lastMsg = messages[messages.length - 1]
+            if (lastMsg.role === 'assistant') {
+              lastMsg.tools.push(...pendingTools)
+            }
+            pendingTools = []
           }
-          return {
-            name: tName,
-            status: 'completed',
-            args: inp,
-            output: t.result || ''
-          }
-        })
+          messages.push({
+            id: 'step_' + (item.step_index || step++),
+            session_id: sessionId,
+            role: 'user',
+            created_at: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
+            text: item.content || '',
+            reasoning: '',
+            tools: []
+          })
+        } else if (item.type === 'PLANNER_RESPONSE') {
+          const currentTools = (item.tool_calls || []).map((t: any) => {
+            const tName = t.toolName || t.name || 'tool'
+            toolStats[tName] = (toolStats[tName] || 0) + 1
+            const inp = t.args || t.parameters || {}
+            const fPath = inp.file_path || inp.filePath || inp.path || inp.TargetFile || inp.AbsolutePath || inp.DirectoryPath || inp.Cwd
+            if (fPath && typeof fPath === 'string') {
+              const cleaned = fPath.replace(/^"|"$/g, '')
+              if (!detectedWorkspace && !cleaned.includes('.gemini/antigravity')) {
+                detectedWorkspace = fs.existsSync(cleaned) && fs.statSync(cleaned).isFile() ? path.dirname(cleaned) : cleaned
+              }
+              if (['replace_file_content', 'write_to_file', 'Edit', 'Write'].includes(tName)) modifiedFiles.add(cleaned)
+              else if (['view_file', 'Read', 'list_dir'].includes(tName)) readFiles.add(cleaned)
+            }
+            return {
+              name: tName,
+              status: 'completed',
+              args: inp,
+              output: t.result || ''
+            }
+          })
+          pendingTools.push(...currentTools)
 
-        messages.push({
-          id: 'step_' + (item.step_index || step++),
-          session_id: sessionId,
-          role: isUser ? 'user' : 'assistant',
-          created_at: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
-          text: item.content || (item.thinking ? '[思考过程]\n' + item.thinking : ''),
-          reasoning: item.thinking || '',
-          tools
-        })
+          if (item.content && item.content.trim()) {
+            messages.push({
+              id: 'step_' + (item.step_index || step++),
+              session_id: sessionId,
+              role: 'assistant',
+              created_at: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
+              text: item.content,
+              reasoning: item.thinking || '',
+              tools: [...pendingTools]
+            })
+            pendingTools = []
+          }
+        } else if (item.type === 'GENERIC') {
+          if (pendingTools.length > 0) {
+            const lastTool = pendingTools[pendingTools.length - 1]
+            if (!lastTool.output) lastTool.output = item.content || ''
+          }
+        }
       } catch(e) {}
     }
 
+    if (pendingTools.length > 0 && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1]
+      if (lastMsg.role === 'assistant') {
+        lastMsg.tools.push(...pendingTools)
+      } else {
+        messages.push({
+          id: 'step_tail',
+          session_id: sessionId,
+          role: 'assistant',
+          created_at: Date.now(),
+          text: '执行了工具操作并完成处理',
+          reasoning: '',
+          tools: pendingTools
+        })
+      }
+      pendingTools = []
+    }
+
+    const realWorkspace = detectedWorkspace || path.join(home, '.gemini/antigravity/brain', sessionId)
     const turns = groupMessagesIntoTurns(messages, sessionId)
     return {
       meta: {
         id: sessionId,
         title: turns[0]?.summary || sessionId,
-        workspace: path.join(home, '.gemini/antigravity/brain', sessionId),
+        workspace: realWorkspace,
+        directory: realWorkspace,
         time_created: messages[0]?.created_at || Date.now()
       },
       messages,
@@ -801,6 +937,107 @@ export function getUnifiedSessionTranscript(
         toolStats,
         subagentSummaries: []
       }
+    }
+  }
+
+  // 5. OpenCode (from SQLite DB)
+  if (source === 'opencode') {
+    const dbPath = getOpenCodeDbPath()
+    if (!dbPath) throw new Error('OpenCode database not found')
+
+    try {
+      const db = new Database(dbPath, { readonly: true })
+      const sessionRow = db.prepare('SELECT * FROM session WHERE id = ?').get(sessionId) as any
+      if (!sessionRow) {
+        db.close()
+        throw new Error('OpenCode session not found: ' + sessionId)
+      }
+
+      const rawMessages = db.prepare('SELECT * FROM message WHERE session_id = ? ORDER BY time_created ASC').all(sessionId) as any[]
+      const rawParts = db.prepare('SELECT * FROM part WHERE session_id = ? ORDER BY time_created ASC').all(sessionId) as any[]
+      db.close()
+
+      const partsByMsg = new Map<string, any[]>()
+      for (const p of rawParts) {
+        if (!partsByMsg.has(p.message_id)) partsByMsg.set(p.message_id, [])
+        partsByMsg.get(p.message_id)!.push(p)
+      }
+
+      const messages: any[] = []
+      const modifiedFiles = new Set<string>()
+      const readFiles = new Set<string>()
+      const toolStats: Record<string, number> = {}
+
+      for (const m of rawMessages) {
+        let mData: any = {}
+        try { mData = JSON.parse(m.data) } catch (e) {}
+        const role = mData.role || 'assistant'
+        let text = ''
+        let reasoning = ''
+        const tools: any[] = []
+
+        const msgParts = partsByMsg.get(m.id) || []
+        for (const p of msgParts) {
+          let pData: any = {}
+          try { pData = JSON.parse(p.data) } catch (e) {}
+          if (pData.type === 'text' && pData.text) {
+            text += (text ? '\n\n' : '') + pData.text
+          } else if (pData.type === 'reasoning' && pData.text) {
+            reasoning += (reasoning ? '\n\n' : '') + pData.text
+          } else if (pData.type === 'tool' || pData.tool) {
+            const tName = pData.tool || 'tool'
+            toolStats[tName] = (toolStats[tName] || 0) + 1
+            const input = pData.state?.input || {}
+            const fPath = input.file_path || input.filePath || input.path || input.TargetFile
+            if (fPath && typeof fPath === 'string') {
+              if (['write', 'edit', 'patch'].includes(tName.toLowerCase())) modifiedFiles.add(fPath)
+              else readFiles.add(fPath)
+            }
+            tools.push({
+              name: tName,
+              status: pData.state?.status || 'completed',
+              args: input,
+              output: typeof pData.state?.output === 'string' ? pData.state.output : JSON.stringify(pData.state?.output || '')
+            })
+          }
+        }
+
+        if (text || reasoning || tools.length > 0) {
+          messages.push({
+            id: m.id,
+            session_id: m.session_id,
+            role,
+            created_at: m.time_created,
+            text,
+            reasoning,
+            tools
+          })
+        }
+      }
+
+      const turns = groupMessagesIntoTurns(messages, sessionId)
+      return {
+        meta: {
+          id: sessionId,
+          title: sessionRow.title || turns[0]?.summary || 'OpenCode 会话',
+          workspace: sessionRow.directory || '~',
+          directory: sessionRow.directory || '~',
+          time_created: sessionRow.time_created || Date.now()
+        },
+        messages,
+        turns,
+        source: 'opencode',
+        sessionCount: 1,
+        descendantCount: 0,
+        analytics: {
+          modifiedFiles: Array.from(modifiedFiles),
+          readFiles: Array.from(readFiles),
+          toolStats,
+          subagentSummaries: []
+        }
+      }
+    } catch (err: any) {
+      throw new Error('Failed to load OpenCode transcript: ' + err.message)
     }
   }
 

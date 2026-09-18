@@ -1293,6 +1293,7 @@ function App() {
                         turn={activeTurn}
                         totalTurns={turnsList.length}
                         theme={theme}
+                        workspacePath={currentSessionMeta?.directory || currentSessionMeta?.workspace}
                         onOpenInFolder={(p) => (window as any).api.openInFolder(p)}
                         onFullScreenCode={(code, lang) => setFullscreenModal({ open: true, code, lang })}
                         onImageClick={() => {}}
@@ -1484,6 +1485,7 @@ function App() {
                                   <div className="space-y-2">
                                     <MarkdownRenderer 
                                       content={sanitized.cleanText || '(空用户指令)'}
+                                      workspacePath={currentSessionMeta?.directory || currentSessionMeta?.workspace}
                                       onOpenFullscreen={(code, lang) => setFullscreenModal({ open: true, code, lang })}
                                     />
                                     {sanitized.hasEnvelopes && (
@@ -1523,6 +1525,7 @@ function App() {
                               return (
                                 <MarkdownRenderer 
                                   content={content}
+                                  workspacePath={currentSessionMeta?.directory || currentSessionMeta?.workspace}
                                   onOpenFullscreen={(code, lang) => setFullscreenModal({ open: true, code, lang })}
                                 />
                               )

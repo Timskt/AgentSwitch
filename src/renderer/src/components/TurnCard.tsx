@@ -13,6 +13,7 @@ interface TurnCardProps {
   turn: ConversationTurn
   totalTurns: number
   theme: AppTheme
+  workspacePath?: string
   onOpenInFolder: (path: string) => void
   onFullScreenCode: (code: string, language: string) => void
   onImageClick: (src: string) => void
@@ -25,6 +26,7 @@ export const TurnCard: React.FC<TurnCardProps> = ({
   turn,
   totalTurns,
   theme,
+  workspacePath,
   onOpenInFolder,
   onFullScreenCode,
   onImageClick,
@@ -149,6 +151,7 @@ export const TurnCard: React.FC<TurnCardProps> = ({
           <MarkdownRenderer 
             content={sanitized.cleanText || '(空用户指令)'} 
             theme={theme}
+            workspacePath={workspacePath}
             onOpenInFolder={onOpenInFolder}
             onFullScreenCode={onFullScreenCode}
             onImageClick={onImageClick}
@@ -339,6 +342,7 @@ export const TurnCard: React.FC<TurnCardProps> = ({
           <MarkdownRenderer 
             content={turn.assistantText || '(本轮无额外文本交付，主要为底层工具执行)'} 
             theme={theme}
+            workspacePath={workspacePath}
             onOpenInFolder={onOpenInFolder}
             onFullScreenCode={onFullScreenCode}
             onImageClick={onImageClick}
