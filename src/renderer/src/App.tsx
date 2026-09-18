@@ -1,14 +1,14 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { 
-  FileText, Code, Cpu, Database, ChevronRight, ChevronDown, 
+  FileText, Code, Cpu, Database, ChevronRight, ChevronLeft, ChevronDown, 
   MessageSquare, Loader2, Maximize2, Bot, User, 
   Search, Check, Copy, Layers, GitFork, ArrowDownToLine,
   Sparkles, ExternalLink, RefreshCw, Terminal, X,
-  SlidersHorizontal, Download, FolderArchive, FolderOpen,
+  SlidersHorizontal, Download, FolderArchive, FolderOpen, Folder,
   Filter, Eye, Calendar, Clock, HardDrive, CheckCircle2,
   ArrowRight, Share2, Settings, Zap, PanelRightOpen, PanelRightClose,
   FileCode, Wrench, Send, BookOpen, Pin, PinOff, ArrowUp, ArrowDown,
-  CheckSquare, Square, UploadCloud
+  CheckSquare, Square, UploadCloud, AlignLeft, ArrowRightLeft, Sliders
 } from 'lucide-react'
 import clsx from 'clsx'
 import { Logo } from './components/Logo'
@@ -678,10 +678,7 @@ function App() {
                 onClick={() => setShowEcosystemRadar(!showEcosystemRadar)}
                 className="flex items-center space-x-1.5 hover:opacity-80 transition-opacity text-[11px]"
               >
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
                 <span className={clsx("font-semibold", t.textPrimary)}>
                   本地雷达 ({ecosystems.filter(e => e.status === 'active').length} 在线)
                 </span>
@@ -1053,22 +1050,24 @@ function App() {
                     <button
                       onClick={() => setViewMode('stream')}
                       className={clsx(
-                        "px-2.5 py-1 rounded text-[11px] font-medium transition-all flex items-center space-x-1",
-                        viewMode === 'stream' ? "bg-indigo-600 text-white font-semibold shadow-xs" : clsx(t.textMuted, "hover:text-zinc-200")
+                        "px-2.5 py-1 rounded text-[11px] font-medium transition-all flex items-center space-x-1.5",
+                        viewMode === 'stream' ? "bg-zinc-800 border border-zinc-700 text-zinc-100 font-semibold shadow-xs" : clsx(t.textMuted, "hover:text-zinc-200")
                       )}
                       title="连续流式视图 (滚动阅览)"
                     >
-                      <span>📜 连续流式</span>
+                      <AlignLeft className="w-3.5 h-3.5" />
+                      <span>流式视图</span>
                     </button>
                     <button
                       onClick={() => setViewMode('card')}
                       className={clsx(
-                        "px-2.5 py-1 rounded text-[11px] font-medium transition-all flex items-center space-x-1",
-                        viewMode === 'card' ? "bg-indigo-600 text-white font-semibold shadow-xs" : clsx(t.textMuted, "hover:text-zinc-200")
+                        "px-2.5 py-1 rounded text-[11px] font-medium transition-all flex items-center space-x-1.5",
+                        viewMode === 'card' ? "bg-zinc-800 border border-zinc-700 text-zinc-100 font-semibold shadow-xs" : clsx(t.textMuted, "hover:text-zinc-200")
                       )}
-                      title="CC-Switch 风格轮次卡片视图 (快捷键 ⌥↑ / ⌥↓ 翻轮)"
+                      title="轮次卡片视图 (快捷键 ⌥↑ / ⌥↓ 翻轮)"
                     >
-                      <span>🗂️ 轮次卡片</span>
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>轮次卡片</span>
                     </button>
                   </div>
 
@@ -1078,19 +1077,19 @@ function App() {
                       "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center space-x-1.5 border",
                       showOutline ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/40" : clsx(t.tagBg, t.tagText, t.border)
                     )}
-                    title="展开/收起 CC-Switch 会话轮次大纲面板 (快捷键 ⌘O)"
+                    title="展开/收起会话轮次大纲面板 (快捷键 ⌘O)"
                   >
-                    <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                    <Layers className="w-3.5 h-3.5 text-zinc-400" />
                     <span>大纲 ({(transcriptData as any)?.turns?.length || 0})</span>
                   </button>
 
                   <button
                     onClick={handleCopyHandoff}
                     className={clsx("px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5 border", t.tagBg, t.tagText, t.border)}
-                    title="复制用于喂给新 AI 模型的无损接力提示词（含修改文件与上下文）"
+                    title="复制用于无损迁移至其他模型的结构化提示词"
                   >
                     <Share2 className={clsx("w-3.5 h-3.5", t.accentText)} />
-                    <span>复制接力提示词</span>
+                    <span>复制交接提示词</span>
                   </button>
 
                   <button
@@ -1109,8 +1108,9 @@ function App() {
               {/* Subheader: Directory Path & Metrics */}
               <div className={clsx("flex items-center justify-between text-[11px] pt-1 border-t", t.border, t.textMuted)}>
                 <div className="flex items-center space-x-2 truncate">
-                  <span className={clsx("font-mono truncate max-w-sm", t.textSecondary)} title={currentSessionMeta?.directory || currentSessionMeta?.workspace}>
-                    📁 {currentSessionMeta?.directory || currentSessionMeta?.workspace || '工程目录'}
+                  <span className={clsx("font-mono truncate max-w-sm flex items-center gap-1.5", t.textSecondary)} title={currentSessionMeta?.directory || currentSessionMeta?.workspace}>
+                    <Folder className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                    <span>{currentSessionMeta?.directory || currentSessionMeta?.workspace || '工程目录'}</span>
                   </span>
                   <span>•</span>
                   <span>
@@ -1186,72 +1186,103 @@ function App() {
                 </div>
               </div>
             </div>
+
+            {/* Dedicated Turn Navigation Toolbar (When in card mode) */}
+            {viewMode === 'card' && (transcriptData as any)?.turns && (transcriptData as any).turns.length > 0 && (
+              <div className={clsx(
+                "px-6 py-2 border-b flex items-center justify-between gap-4 select-none shrink-0 transition-colors z-10",
+                t.filterBarBg, t.border
+              )}>
+                {/* Left: Prev / Next Buttons */}
+                <div className="flex items-center space-x-2 shrink-0">
+                  <button
+                    disabled={currentTurnIndex <= 1}
+                    onClick={() => {
+                      setCurrentTurnIndex(prev => Math.max(1, prev - 1))
+                      document.getElementById('message-feed-container')?.scrollTo({ top: 0, behavior: 'instant' })
+                    }}
+                    className={clsx(
+                      "h-8 px-3 rounded-lg text-xs font-medium border transition-all flex items-center space-x-1.5 shrink-0 whitespace-nowrap",
+                      currentTurnIndex <= 1 
+                        ? "opacity-35 cursor-not-allowed border-zinc-800 text-zinc-600" 
+                        : clsx(t.buttonSecondary, "hover:border-zinc-600 active:scale-95")
+                    )}
+                    title="上一轮交互 (⌥↑)"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
+                    <span className="whitespace-nowrap">上一轮</span>
+                    <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700/60 font-mono text-zinc-400">⌥↑</kbd>
+                  </button>
+
+                  <button
+                    disabled={currentTurnIndex >= (transcriptData as any).turns.length}
+                    onClick={() => {
+                      setCurrentTurnIndex(prev => Math.min((transcriptData as any).turns.length, prev + 1))
+                      document.getElementById('message-feed-container')?.scrollTo({ top: 0, behavior: 'instant' })
+                    }}
+                    className={clsx(
+                      "h-8 px-3 rounded-lg text-xs font-medium border transition-all flex items-center space-x-1.5 shrink-0 whitespace-nowrap",
+                      currentTurnIndex >= (transcriptData as any).turns.length 
+                        ? "opacity-35 cursor-not-allowed border-zinc-800 text-zinc-600" 
+                        : clsx(t.buttonSecondary, "hover:border-zinc-600 active:scale-95")
+                    )}
+                    title="下一轮交互 (⌥↓)"
+                  >
+                    <span className="whitespace-nowrap">下一轮</span>
+                    <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+                    <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700/60 font-mono text-zinc-400">⌥↓</kbd>
+                  </button>
+                </div>
+
+                {/* Center: Jump dropdown */}
+                <div className="flex-1 min-w-0 max-w-xl relative flex items-center">
+                  <Layers className="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-2.5 pointer-events-none absolute left-0" />
+                  <select
+                    value={currentTurnIndex}
+                    onChange={(e) => {
+                      setCurrentTurnIndex(Number(e.target.value))
+                      document.getElementById('message-feed-container')?.scrollTo({ top: 0, behavior: 'instant' })
+                    }}
+                    className={clsx(
+                      "w-full h-8 pl-8 pr-8 rounded-lg text-xs font-mono font-medium border outline-none cursor-pointer truncate transition-colors appearance-none",
+                      t.inputBg, t.border, t.textPrimary, "hover:border-zinc-600 focus:border-indigo-500"
+                    )}
+                  >
+                    {((transcriptData as any).turns as ConversationTurn[]).map(turnItem => {
+                      const clean = sanitizePrompt(turnItem.summary || turnItem.userText || '').cleanText
+                        .replace(/[\r\n\t]+/g, ' ')
+                        .trim()
+                      return (
+                        <option key={turnItem.turnIndex} value={turnItem.turnIndex} className="bg-zinc-900 text-zinc-200">
+                          第 {turnItem.turnIndex} 轮: {clean.slice(0, 50) || `交互 #${turnItem.turnIndex}`}{clean.length > 50 ? '...' : ''}
+                        </option>
+                      )
+                    })}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 text-zinc-400 shrink-0 mr-2.5 pointer-events-none absolute right-0" />
+                </div>
+
+                {/* Right: Counter */}
+                <div className="flex items-center space-x-2 text-xs shrink-0 whitespace-nowrap font-mono">
+                  <span className={clsx("px-2.5 py-1 rounded-md border text-[11px]", t.tagBg, t.tagText, t.border)}>
+                    <strong className={clsx("font-bold", t.accentText)}>{currentTurnIndex}</strong>
+                    <span className="opacity-40 mx-1">/</span>
+                    <span>{(transcriptData as any).turns.length} 轮</span>
+                  </span>
+                </div>
+              </div>
+            )}
             
             {/* Messages Feed Area */}
             <div id="message-feed-container" className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar select-text relative">
               {loading ? (
                 <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-3">
                   <Loader2 className="w-7 h-7 animate-spin text-zinc-400" />
-                  <p className="text-xs">正在从本地生态解析并时序归拢会话轨迹...</p>
+                  <p className="text-xs">正在解析并加载会话轨迹...</p>
                 </div>
               ) : viewMode === 'card' && (transcriptData as any)?.turns && (transcriptData as any).turns.length > 0 ? (
                 /* CC-Switch Turn Card View */
                 <div className="max-w-4xl mx-auto space-y-4 pb-20">
-                  {/* Sticky Turn Pagination Controller */}
-                  <div className={clsx(
-                    "p-3 rounded-2xl border flex items-center justify-between shadow-sm sticky top-0 z-20 backdrop-blur-md",
-                    t.cardBg, t.border
-                  )}>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        disabled={currentTurnIndex <= 1}
-                        onClick={() => setCurrentTurnIndex(prev => Math.max(1, prev - 1))}
-                        className={clsx(
-                          "px-3 py-1.5 rounded-lg text-xs font-medium border transition-all flex items-center space-x-1.5",
-                          currentTurnIndex <= 1 ? "opacity-30 cursor-not-allowed" : t.buttonSecondary
-                        )}
-                        title="上一轮交互 (⌥↑)"
-                      >
-                        <span>‹ 上一轮</span>
-                        <kbd className="text-[10px] px-1 py-0.2 rounded bg-black/20 border border-white/10 font-mono">⌥↑</kbd>
-                      </button>
-
-                      <select
-                        value={currentTurnIndex}
-                        onChange={(e) => setCurrentTurnIndex(Number(e.target.value))}
-                        className={clsx(
-                          "px-3 py-1.5 rounded-lg text-xs font-mono font-medium border outline-none cursor-pointer max-w-xs truncate",
-                          t.inputBg, t.border, t.textPrimary
-                        )}
-                      >
-                        {((transcriptData as any).turns as ConversationTurn[]).map(turnItem => (
-                          <option key={turnItem.turnIndex} value={turnItem.turnIndex}>
-                            #{turnItem.turnIndex}: {turnItem.summary.slice(0, 40)}...
-                          </option>
-                        ))}
-                      </select>
-
-                      <button
-                        disabled={currentTurnIndex >= (transcriptData as any).turns.length}
-                        onClick={() => setCurrentTurnIndex(prev => Math.min((transcriptData as any).turns.length, prev + 1))}
-                        className={clsx(
-                          "px-3 py-1.5 rounded-lg text-xs font-medium border transition-all flex items-center space-x-1.5",
-                          currentTurnIndex >= (transcriptData as any).turns.length ? "opacity-30 cursor-not-allowed" : t.buttonSecondary
-                        )}
-                        title="下一轮交互 (⌥↓)"
-                      >
-                        <span>下一轮 ›</span>
-                        <kbd className="text-[10px] px-1 py-0.2 rounded bg-black/20 border border-white/10 font-mono">⌥↓</kbd>
-                      </button>
-                    </div>
-
-                    <div className="flex items-center space-x-2 text-xs">
-                      <span className={clsx("font-mono", t.textMuted)}>
-                        第 <strong className={t.accentText}>{currentTurnIndex}</strong> / {(transcriptData as any).turns.length} 回合
-                      </span>
-                    </div>
-                  </div>
-
                   {/* Render the Active Turn Card */}
                   {(() => {
                     const turnsList = (transcriptData as any).turns as ConversationTurn[]
@@ -1265,6 +1296,14 @@ function App() {
                         onOpenInFolder={(p) => (window as any).api.openInFolder(p)}
                         onFullScreenCode={(code, lang) => setFullscreenModal({ open: true, code, lang })}
                         onImageClick={() => {}}
+                        onNextTurn={() => {
+                          setCurrentTurnIndex(prev => Math.min(turnsList.length, prev + 1))
+                          document.getElementById('message-feed-container')?.scrollTo({ top: 0, behavior: 'instant' })
+                        }}
+                        onPrevTurn={() => {
+                          setCurrentTurnIndex(prev => Math.max(1, prev - 1))
+                          document.getElementById('message-feed-container')?.scrollTo({ top: 0, behavior: 'instant' })
+                        }}
                         isFocused={true}
                       />
                     )
@@ -1412,7 +1451,7 @@ function App() {
                                     <div key={tIdx} className={clsx("p-2.5 rounded-lg border font-mono text-[10px]", t.cardBg, t.border)}>
                                       <div className={clsx("flex items-center justify-between font-semibold mb-1", t.textPrimary)}>
                                         <span className="flex items-center space-x-1.5">
-                                          <span>⚡</span>
+                                          <Zap className="w-3 h-3 text-zinc-400" />
                                           <span>{tool.tool_name || tool.tool || 'Tool'}</span>
                                         </span>
                                         <span className={clsx("text-[9px] px-1.5 py-0.5 rounded uppercase font-medium", t.tagBg, t.tagText)}>
@@ -1450,9 +1489,10 @@ function App() {
                                     {sanitized.hasEnvelopes && (
                                       <div className="pt-1">
                                         <details className="text-[11px] font-mono text-zinc-400 bg-black/20 rounded-lg p-2 border border-white/5">
-                                          <summary className="cursor-pointer text-[10px] text-zinc-400 hover:text-zinc-200 font-sans font-medium select-none flex items-center gap-1">
-                                            <span>⚙️ 附带上下文元数据与环境包装</span>
-                                            <span className="text-zinc-500 font-mono text-[9px]">(已自动提纯核心指令)</span>
+                                          <summary className="cursor-pointer text-[10px] text-zinc-400 hover:text-zinc-200 font-sans font-medium select-none flex items-center gap-1.5">
+                                            <Sliders className="w-3 h-3 text-zinc-400" />
+                                            <span>环境元数据与包装上下文</span>
+                                            <span className="text-zinc-500 font-mono text-[9px]">(已提取核心指令)</span>
                                           </summary>
                                           <div className="mt-2 space-y-2 border-t border-white/5 pt-2">
                                             {sanitized.contextSummary && (
@@ -1582,27 +1622,31 @@ function App() {
           <div className={clsx("grid grid-cols-4 p-1 border-b text-[10px] font-medium transition-colors", t.filterBarBg, t.border)}>
             <button
               onClick={() => setInspectorTab('handoff')}
-              className={clsx("py-1.5 rounded transition-colors text-center", inspectorTab === 'handoff' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+              className={clsx("py-1.5 rounded transition-colors flex items-center justify-center gap-1", inspectorTab === 'handoff' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
             >
-              🚀 AI接力
+              <ArrowRightLeft className="w-3 h-3" />
+              <span>上下文交接</span>
             </button>
             <button
               onClick={() => setInspectorTab('files')}
-              className={clsx("py-1.5 rounded transition-colors text-center", inspectorTab === 'files' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+              className={clsx("py-1.5 rounded transition-colors flex items-center justify-center gap-1", inspectorTab === 'files' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
             >
-              📁 文件 ({analytics?.modifiedFiles.length || 0})
+              <FileCode className="w-3 h-3" />
+              <span>变更文件 ({analytics?.modifiedFiles.length || 0})</span>
             </button>
             <button
               onClick={() => setInspectorTab('tools')}
-              className={clsx("py-1.5 rounded transition-colors text-center", inspectorTab === 'tools' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+              className={clsx("py-1.5 rounded transition-colors flex items-center justify-center gap-1", inspectorTab === 'tools' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
             >
-              ⚡ 工具画像
+              <Terminal className="w-3 h-3" />
+              <span>工具统计</span>
             </button>
             <button
               onClick={() => setInspectorTab('export')}
-              className={clsx("py-1.5 rounded transition-colors text-center", inspectorTab === 'export' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+              className={clsx("py-1.5 rounded transition-colors flex items-center justify-center gap-1", inspectorTab === 'export' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
             >
-              💾 导出格式
+              <Download className="w-3 h-3" />
+              <span>数据导出</span>
             </button>
           </div>
 
@@ -1613,28 +1657,28 @@ function App() {
               <div className="space-y-3.5">
                 <div className={clsx("p-3 rounded-xl border text-xs space-y-2", t.cardBg, t.border)}>
                   <div className={clsx("flex items-center space-x-1.5 font-semibold", t.accentText)}>
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>零丢失模型交接机制</span>
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>跨模型任务交接 (Handoff)</span>
                   </div>
                   <p className={clsx("text-[11px] leading-relaxed", t.textSecondary)}>
-                    直接把聊天记录扔给其他模型会丢失工程上下文。点击下方按钮即可一键提取<strong>累计修改的 {analytics?.modifiedFiles.length || 0} 个文件</strong>、历史结论与执行画像，生成高密度的接力提示词。
+                    汇总会话工程根目录、<strong>已变更的 {analytics?.modifiedFiles.length || 0} 个文件</strong>、关键执行结论与最近交互，生成可直接无缝粘贴至新模型或 Agent 的结构化 Markdown 提示词。
                   </p>
                   <button
                     onClick={handleCopyHandoff}
                     className={clsx("w-full py-2 text-white rounded-lg font-medium text-xs transition-colors flex items-center justify-center space-x-1.5 shadow-sm", t.accentBg)}
                   >
                     <Copy className="w-3.5 h-3.5" />
-                    <span>复制完整 AI 接力文档 (Markdown)</span>
+                    <span>复制交接提示词 (Markdown)</span>
                   </button>
                 </div>
 
                 <div className={clsx("p-3 rounded-xl border space-y-2 text-xs", t.cardBg, t.border)}>
-                  <span className={clsx("font-semibold", t.textPrimary)}>交接内容包含：</span>
+                  <span className={clsx("font-semibold", t.textPrimary)}>交接提示词包含：</span>
                   <ul className={clsx("text-[11px] space-y-1.5 pl-3 list-disc", t.textSecondary)}>
                     <li>工作区绝对路径与前置任务背景</li>
-                    <li>{analytics?.modifiedFiles.length || 0} 个核心已修改代码/文档清单</li>
+                    <li>{analytics?.modifiedFiles.length || 0} 个已修改代码/文档完整路径</li>
                     <li>{analytics?.subagentCount || 0} 个子任务 Agent 的执行结论</li>
-                    <li>最近 25 轮关键用户诉求与工具回执</li>
+                    <li>最近关键轮次的用户诉求与工具回执</li>
                   </ul>
                   <button
                     onClick={() => handleExport('handoff')}

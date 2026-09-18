@@ -477,6 +477,22 @@ export function getAllEcosystemSessions(agentFilter: string = 'all'): { sessions
   }
 }
 
+function extractCleanSummary(rawText: string): string {
+  if (!rawText) return ''
+  let text = rawText.trim()
+  text = text.replace(/<CONTEXT_SUMMARY>[\s\S]*?<\/CONTEXT_SUMMARY>/gi, '')
+             .replace(/<ADDITIONAL_METADATA>[\s\S]*?<\/ADDITIONAL_METADATA>/gi, '')
+             .replace(/<SYSTEM_MESSAGE>[\s\S]*?<\/SYSTEM_MESSAGE>/gi, '')
+  const reqMatch = text.match(/<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/i)
+  if (reqMatch) {
+    text = reqMatch[1]
+  } else {
+    text = text.replace(/<USER_REQUEST>([\s\S]*)$/i, '$1')
+  }
+  text = text.replace(/<\/?(?:USER_REQUEST|user_request|user|prompt)>/gi, '')
+  return text.trim().replace(/[\r\n\t]+/g, ' ').slice(0, 80)
+}
+
 /**
  * Group raw messages into CC-Switch style ConversationTurn objects
  */
@@ -491,7 +507,7 @@ export function groupMessagesIntoTurns(messages: any[], mainSessionId?: string):
 
     if (isUser || !curTurn) {
       if (curTurn) turns.push(curTurn)
-      const cleanSummary = text.trim().replace(/[\r\n\t]+/g, ' ').slice(0, 80)
+      const cleanSummary = extractCleanSummary(text)
       curTurn = {
         turnIndex: turns.length + 1,
         turnId: m.id || 'turn_' + (turns.length + 1),

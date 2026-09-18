@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { AppTheme, THEME_STYLES } from '../theme'
+import { sanitizePrompt } from '../utils/promptSanitizer'
 
 export interface ConversationTurn {
   turnIndex: number
@@ -200,7 +201,7 @@ export const TurnOutline: React.FC<TurnOutlineProps> = ({
                   "text-xs leading-snug line-clamp-2 pl-1 mb-2 font-medium",
                   isActive ? t.textPrimary : t.textSecondary
                 )}>
-                  {turn.summary}
+                  {sanitizePrompt(turn.summary || turn.userText || '').cleanText.slice(0, 80) || turn.summary}
                 </p>
 
                 {/* Badges footer */}
@@ -232,7 +233,7 @@ export const TurnOutline: React.FC<TurnOutlineProps> = ({
 
       {/* Footer Mode info */}
       <div className={clsx("p-2.5 border-t flex items-center justify-between text-[11px]", t.border)}>
-        <span className={clsx(t.textMuted)}>当前模式:</span>
+        <span className={clsx(t.textMuted)}>视图模式:</span>
         <button
           onClick={onToggleViewMode}
           className={clsx(
@@ -240,7 +241,7 @@ export const TurnOutline: React.FC<TurnOutlineProps> = ({
             viewMode === 'card' ? "bg-indigo-600 text-white border-indigo-500" : t.buttonSecondary
           )}
         >
-          {viewMode === 'card' ? '🗂️ 轮次卡片模式' : '📜 连续流式模式'}
+          {viewMode === 'card' ? '轮次卡片模式' : '连续流式模式'}
         </button>
       </div>
     </div>

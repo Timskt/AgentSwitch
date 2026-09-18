@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { 
   X, Palette, Database, Sparkles, RefreshCw, Check, 
-  ExternalLink, Download, FolderOpen, Shield, Bell, CheckCircle2 
+  ExternalLink, Download, FolderOpen, Shield, Bell, CheckCircle2, Info
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -99,27 +99,31 @@ export function SettingsModal({
         <div className="flex border-b border-zinc-800 bg-zinc-900 px-6 space-x-6 text-xs font-medium">
           <button
             onClick={() => setTab('appearance')}
-            className={clsx("py-2.5 border-b-2 transition-colors", tab === 'appearance' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
+            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5", tab === 'appearance' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
           >
-            🎨 外观与皮肤
+            <Palette className="w-3.5 h-3.5" />
+            <span>外观与主题</span>
           </button>
           <button
             onClick={() => setTab('database')}
-            className={clsx("py-2.5 border-b-2 transition-colors", tab === 'database' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
+            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5", tab === 'database' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
           >
-            📁 本地数据库
+            <Database className="w-3.5 h-3.5" />
+            <span>本地数据库</span>
           </button>
           <button
             onClick={() => setTab('update')}
-            className={clsx("py-2.5 border-b-2 transition-colors", tab === 'update' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
+            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5", tab === 'update' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
           >
-            🔄 自动更新
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>自动更新</span>
           </button>
           <button
             onClick={() => setTab('about')}
-            className={clsx("py-2.5 border-b-2 transition-colors", tab === 'about' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
+            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5", tab === 'about' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
           >
-            ℹ️ 关于
+            <Info className="w-3.5 h-3.5" />
+            <span>关于</span>
           </button>
         </div>
 
@@ -200,8 +204,9 @@ export function SettingsModal({
                 </button>
               </div>
 
-              <div className="p-3.5 bg-zinc-900/40 border border-zinc-800/80 rounded-xl text-[11px] text-zinc-400 leading-relaxed">
-                💡 <strong>提示</strong>：系统默认只读连接当前用户的 ZCode 存储。如果您将旧电脑、外接硬盘或团队历史备份迁移到了其它文件夹，可以直接指定该路径进行分析与导出。
+              <div className="p-3.5 bg-zinc-900/40 border border-zinc-800/80 rounded-xl text-[11px] text-zinc-400 leading-relaxed flex items-start gap-2">
+                <Info className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
+                <span><strong>说明</strong>：系统默认只读连接当前用户的 ZCode 存储。如果您将旧电脑、外接硬盘或团队历史备份迁移到了其它文件夹，可以直接指定该路径进行分析与导出。</span>
               </div>
             </div>
           )}
