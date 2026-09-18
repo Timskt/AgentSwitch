@@ -8,17 +8,21 @@ import {
   Filter, Eye, Calendar, Clock, HardDrive, CheckCircle2,
   ArrowRight, Share2, Settings, Zap, PanelRightOpen, PanelRightClose,
   FileCode, Wrench, Send, BookOpen, Pin, PinOff, ArrowUp, ArrowDown,
-  CheckSquare, Square, UploadCloud, AlignLeft, ArrowRightLeft, Sliders
+  CheckSquare, Square, UploadCloud, AlignLeft, ArrowRightLeft, Sliders,
+  Languages, SunMoon
 } from 'lucide-react'
 import clsx from 'clsx'
 import { Logo } from './components/Logo'
 import { MarkdownRenderer } from './components/MarkdownRenderer'
 import { SettingsModal } from './components/SettingsModal'
-import { FullScreenCodeModal } from './components/FullScreenCodeModal'
+import { FilePreviewModal, FilePreviewData } from './components/FilePreviewModal'
+import { ToastContainer, ToastMessage } from './components/Toast'
 import { TurnOutline, ConversationTurn } from './components/TurnOutline'
 import { TurnCard } from './components/TurnCard'
-import { THEME_STYLES, AppTheme } from './theme'
+import { THEME_STYLES, AppTheme, AppThemeMode, resolveEffectiveTheme, getSystemTheme } from './theme'
+import { useI18n } from './i18n'
 import { sanitizePrompt } from './utils/promptSanitizer'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 interface ZSession {
   id: string
@@ -108,13 +112,96 @@ function App() {
   const [showInspector, setShowInspector] = useState<boolean>(true)
   const [inspectorTab, setInspectorTab] = useState<'handoff' | 'files' | 'tools' | 'export'>('handoff')
   
-  // Theme & Appearance Preferences
-  const [theme, setTheme] = useState<AppTheme>(() => (localStorage.getItem('zm_theme') as AppTheme) || 'obsidian')
+  // i18n Multi-Language
+  const { locale, setLocale, t: tr } = useI18n()
+
+  // Theme & Appearance Preferences with Follow System Dark Mode
+  const [themeMode, setThemeMode] = useState<AppThemeMode>(() => (localStorage.getItem('zm_theme_mode') as AppThemeMode) || 'system')
+  const [effectiveTheme, setEffectiveTheme] = useState<AppTheme>(() => resolveEffectiveTheme(themeMode))
   const [fontSize, setFontSize] = useState<number>(() => Number(localStorage.getItem('zm_font_size')) || 13)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
-  // Fullscreen Code Modal
-  const [fullscreenModal, setFullscreenModal] = useState<{ open: boolean, code: string, lang: string } | null>(null)
+  // Reactive listener for OS dark/light mode preference
+  useEffect(() => {
+    const mql = window.matchMedia('(prefers-color-scheme: dark)')
+    const updateTheme = () => {
+      if (themeMode === 'system') {
+        setEffectiveTheme(mql.matches ? 'obsidian' : 'light')
+      } else {
+        setEffectiveTheme(themeMode as AppTheme)
+      }
+    }
+    updateTheme()
+    mql.addEventListener('change', updateTheme)
+    return () => mql.removeEventListener('change', updateTheme)
+  }, [themeMode])
+
+  const handleThemeModeChange = (mode: AppThemeMode) => {
+    setThemeMode(mode)
+    localStorage.setItem('zm_theme_mode', mode)
+    setEffectiveTheme(resolveEffectiveTheme(mode))
+  }
+
+  // Universal File Preview Modal (Code, Text, Markdown, Image, Oversized Protection)
+  const [previewModalData, setPreviewModalData] = useState<FilePreviewData | null>(null)
+  const [previewModalOpen, setPreviewModalOpen] = useState(false)
+
+  // Floating Non-blocking Toast System for Safety & Error Fallbacks
+  const [toasts, setToasts] = useState<ToastMessage[]>([])
+  const addToast = (toast: Omit<ToastMessage, 'id'>) => {
+    const id = Math.random().toString(36).substring(2, 9)
+    setToasts(prev => [...prev, { ...toast, id }])
+  }
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }
+
+  // Safe file preview & inspection pipeline with multi-tier fallback
+  const handlePreviewFile = async (targetPath: string) => {
+    if (!targetPath) return
+    const currentWs = currentSessionMeta?.directory || currentSessionMeta?.workspace
+    try {
+      // @ts-ignore
+      const res = await window.api.readFilePreview(targetPath, currentWs)
+      if (res.isDirectory) {
+        addToast({
+          type: 'info',
+          title: locale === 'en-US' ? 'Opened in Finder' : '已在访达中定位目录',
+          description: res.path
+        })
+        return
+      }
+      if (res.success) {
+        setPreviewModalData({
+          ...res,
+          path: res.path || targetPath
+        })
+        setPreviewModalOpen(true)
+        return
+      }
+      // Non-blocking fallback notification for invalid path / detection false positive
+      addToast({
+        type: 'warning',
+        title: tr('preview.notFoundToast'),
+        description: targetPath,
+        actionLabel: tr('preview.copyPath'),
+        onAction: () => {
+          navigator.clipboard.writeText(targetPath)
+          addToast({
+            type: 'success',
+            title: tr('toast.copied'),
+            duration: 1500
+          })
+        }
+      })
+    } catch (err: any) {
+      addToast({
+        type: 'error',
+        title: 'Preview error',
+        description: String(err?.message || err)
+      })
+    }
+  }
 
   // Pinned Sessions & Sorting & Batch Mode
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => {
@@ -183,8 +270,7 @@ function App() {
   }
 
   const handleThemeChange = (newTheme: AppTheme) => {
-    setTheme(newTheme)
-    localStorage.setItem('zm_theme', newTheme)
+    handleThemeModeChange(newTheme)
   }
 
   const handleFontSizeChange = (sz: number) => {
@@ -489,7 +575,7 @@ function App() {
   }
 
   // Active theme style tokens
-  const t = THEME_STYLES[theme] || THEME_STYLES.obsidian
+  const t = THEME_STYLES[effectiveTheme] || THEME_STYLES.obsidian
 
   return (
     <div className={clsx("flex h-screen font-sans select-none overflow-hidden antialiased", t.appBg, t.textSecondary)} style={{ fontSize: `${fontSize}px` }}>
@@ -505,8 +591,10 @@ function App() {
       <SettingsModal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
-        currentTheme={theme}
-        onThemeChange={handleThemeChange}
+        currentThemeMode={themeMode}
+        onThemeModeChange={handleThemeModeChange}
+        locale={locale}
+        onLocaleChange={setLocale}
         fontSize={fontSize}
         onFontSizeChange={handleFontSizeChange}
         dbPath={dbStats?.dbPath}
@@ -514,15 +602,21 @@ function App() {
         onRefreshDb={loadSessions}
       />
 
-      {/* Fullscreen Code Modal */}
-      {fullscreenModal && (
-        <FullScreenCodeModal
-          open={fullscreenModal.open}
-          onClose={() => setFullscreenModal(null)}
-          code={fullscreenModal.code}
-          lang={fullscreenModal.lang}
+      {/* Universal File & Code & Image Preview Modal */}
+      <ErrorBoundary fallbackTitle="文件预览组件遇到异常">
+        <FilePreviewModal
+          open={previewModalOpen}
+          onClose={() => setPreviewModalOpen(false)}
+          data={previewModalData}
+          theme={effectiveTheme}
+          locale={locale}
+          onOpenInEditor={(p) => (window as any).api.openInEditor(p)}
+          onRevealInFinder={(p) => (window as any).api.openInFolder(p)}
         />
-      )}
+      </ErrorBoundary>
+
+      {/* Crash-Proof Floating Toast System */}
+      <ToastContainer toasts={toasts} onDismiss={removeToast} />
 
       {/* Preview Modal */}
       {previewModal && (
@@ -533,7 +627,7 @@ function App() {
                 <FileText className="w-5 h-5 text-indigo-400" />
                 <div>
                   <h3 className="text-sm font-semibold text-zinc-100">{previewModal.title}</h3>
-                  <p className="text-[11px] text-zinc-400 font-mono mt-0.5">{previewModal.filename} • {previewModal.messageCount} 条消息</p>
+                  <p className="text-[11px] text-zinc-400 font-mono mt-0.5">{previewModal.filename} • {previewModal.messageCount} {locale === 'en-US' ? 'messages' : '条消息'}</p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
@@ -542,14 +636,14 @@ function App() {
                   className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5 border border-zinc-700"
                 >
                   <Copy className="w-3.5 h-3.5" />
-                  <span>复制全文</span>
+                  <span>{locale === 'en-US' ? 'Copy All' : '复制全文'}</span>
                 </button>
                 <button
                   onClick={() => handleExport(previewModal.format)}
                   className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5 shadow-sm"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>保存至文件...</span>
+                  <span>{locale === 'en-US' ? 'Save to File...' : '保存至文件...'}</span>
                 </button>
                 <button
                   onClick={() => setPreviewModal(null)}
@@ -563,7 +657,7 @@ function App() {
               <pre className="whitespace-pre-wrap leading-relaxed">{previewModal.content.slice(0, 100000)}</pre>
               {previewModal.content.length > 100000 && (
                 <div className="p-3 text-center text-zinc-500 text-xs italic border-t border-zinc-800 mt-4">
-                  （预览展示前 100,000 字符，保存时写入完整数据）
+                  {locale === 'en-US' ? '(Showing first 100,000 characters, full data saved on export)' : '（预览展示前 100,000 字符，保存时写入完整数据）'}
                 </div>
               )}
             </div>
@@ -592,20 +686,30 @@ function App() {
                   "text-[10px] font-semibold px-1.5 py-0.5 rounded border",
                   t.tagBg, t.tagText, t.border
                 )}>
-                  v2.5
+                  v2.6
                 </span>
               </div>
-              <p className={clsx("text-[11px] truncate mt-0.5", t.textMuted)}>全生态 Agent 记忆中枢与切换工坊</p>
+              <p className={clsx("text-[11px] truncate mt-0.5", t.textMuted)}>{tr('brand.tagline')}</p>
             </div>
             
-            {/* Settings Gear Button */}
-            <button 
-              onClick={() => setSettingsOpen(true)}
-              title="打开系统偏好设置 (⌘,)"
-              className={clsx("p-1.5 rounded-lg transition-colors hover:bg-black/10 dark:hover:bg-white/10", t.textMuted)}
-            >
-              <Settings className="w-3.5 h-3.5" />
-            </button>
+            {/* Action Buttons: Language Switch & Settings */}
+            <div className="flex items-center space-x-1 shrink-0">
+              <button
+                onClick={() => setLocale(locale === 'zh-CN' ? 'en-US' : 'zh-CN')}
+                title={locale === 'zh-CN' ? 'Switch to English' : '切换至简体中文'}
+                className={clsx("px-2 py-1 rounded-lg text-[10px] font-mono font-medium transition-colors border flex items-center gap-1", t.tagBg, t.border, t.textSecondary, "hover:text-white")}
+              >
+                <Languages className="w-3 h-3 text-indigo-400" />
+                <span>{locale === 'zh-CN' ? 'EN' : '中'}</span>
+              </button>
+              <button 
+                onClick={() => setSettingsOpen(true)}
+                title={tr('settings.title')}
+                className={clsx("p-1.5 rounded-lg transition-colors hover:bg-black/10 dark:hover:bg-white/10", t.textMuted)}
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
           {/* Unified High-Density Ecosystem Switcher (CC-Switch Style, Zero Horizontal Overflow) */}
@@ -613,37 +717,37 @@ function App() {
             {[
               { 
                 id: 'all', 
-                label: '全部', 
+                label: tr('ecosystem.all'), 
                 color: '#6366f1', 
                 count: ecosystems.reduce((sum, e) => sum + (e.sessionCount || 0), 0) || allSessions.length 
               },
               { 
                 id: 'zcode', 
-                label: 'ZCode', 
+                label: tr('ecosystem.zcode'), 
                 color: '#6366f1', 
                 count: ecosystems.find(e => e.id === 'zcode')?.sessionCount ?? 0 
               },
               { 
                 id: 'antigravity', 
-                label: '反重力', 
+                label: tr('ecosystem.antigravity'), 
                 color: '#a855f7', 
                 count: ecosystems.find(e => e.id === 'antigravity')?.sessionCount ?? 0 
               },
               { 
                 id: 'claude', 
-                label: 'Claude', 
+                label: tr('ecosystem.claude'), 
                 color: '#f59e0b', 
                 count: ecosystems.find(e => e.id === 'claude')?.sessionCount ?? 0 
               },
               { 
                 id: 'codex', 
-                label: 'Codex', 
+                label: tr('ecosystem.codex'), 
                 color: '#10b981', 
                 count: ecosystems.find(e => e.id === 'codex')?.sessionCount ?? 0 
               },
               { 
                 id: 'opencode', 
-                label: 'OpenCode', 
+                label: tr('ecosystem.opencode'), 
                 color: '#38bdf8', 
                 count: ecosystems.find(e => e.id === 'opencode')?.sessionCount ?? 0 
               }
@@ -687,7 +791,7 @@ function App() {
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
                 <span className={clsx("font-semibold", t.textPrimary)}>
-                  本地雷达 ({ecosystems.filter(e => e.status === 'active').length} 在线)
+                  {tr('radar.title')} ({ecosystems.filter(e => e.status === 'active').length} {tr('radar.online')})
                 </span>
                 <ChevronDown className={clsx("w-3 h-3 transition-transform text-zinc-400", showEcosystemRadar && "rotate-180")} />
               </button>
@@ -696,19 +800,19 @@ function App() {
                 <button
                   onClick={handleImportSession}
                   className={clsx("px-2 py-0.5 rounded text-[10px] font-medium border flex items-center space-x-1 transition-colors", t.tagBg, t.tagText, t.border)}
-                  title="导入任意外部会话文件 (.jsonl / .json / .md)"
+                  title={tr('radar.importTooltip')}
                 >
                   <UploadCloud className="w-3 h-3" />
-                  <span>导入</span>
+                  <span>{tr('radar.importBtn')}</span>
                 </button>
                 {dbStats && (
                   <button 
                     onClick={handleBatchExport}
                     className={clsx("px-2 py-0.5 rounded text-[10px] font-medium border flex items-center space-x-1 transition-colors", t.accentBg, "text-white border-transparent")}
-                    title="一键将所有会话批量导出至指定目录"
+                    title={tr('radar.exportTooltip')}
                   >
                     <FolderArchive className="w-3 h-3" />
-                    <span>导出</span>
+                    <span>{tr('radar.exportBtn')}</span>
                   </button>
                 )}
               </div>
@@ -729,7 +833,7 @@ function App() {
                       </span>
                     </div>
                     <span className={clsx("text-[10px] font-mono", eco.status === 'active' ? t.accentText : t.textMuted)}>
-                      {eco.status === 'active' ? (eco.sizeText || `${eco.sessionCount} 会话`) : '未检出'}
+                      {eco.status === 'active' ? (eco.sizeText || `${eco.sessionCount} 会话`) : (locale === 'en-US' ? 'Not detected' : '未检出')}
                     </span>
                   </div>
                 ))}
@@ -744,9 +848,9 @@ function App() {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                 <span className={t.textPrimary}>{dbStats.dbSize}</span>
                 <span>•</span>
-                <span>{dbStats.totalSessions} 会话</span>
+                <span>{dbStats.totalSessions} {locale === 'en-US' ? 'Sessions' : '会话'}</span>
                 <span>•</span>
-                <span>{dbStats.totalMessages} 消息</span>
+                <span>{dbStats.totalMessages} {locale === 'en-US' ? 'Messages' : '消息'}</span>
               </div>
             </div>
           )}
@@ -757,7 +861,7 @@ function App() {
               <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input 
                 type="text"
-                placeholder="搜索标题、ID 或路径 (⌘F)..."
+                placeholder={tr('search.placeholder')}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className={clsx(
@@ -775,15 +879,15 @@ function App() {
             {/* Sort & Batch Toggle Bar */}
             <div className={clsx("flex items-center justify-between text-[11px] px-1", t.textMuted)}>
               <div className="flex items-center space-x-1.5">
-                <span>排序:</span>
+                <span>{tr('search.sortBy')}:</span>
                 <select
                   value={sortBy}
                   onChange={e => setSortBy(e.target.value as any)}
                   className={clsx("bg-transparent focus:outline-none cursor-pointer", t.textPrimary)}
                 >
-                  <option value="time">最近更新</option>
-                  <option value="messages">消息数量</option>
-                  <option value="created">创建时间</option>
+                  <option value="time">{tr('search.recent')}</option>
+                  <option value="messages">{tr('search.mostMessages')}</option>
+                  <option value="created">{locale === 'en-US' ? 'Created Time' : '创建时间'}</option>
                 </select>
               </div>
 
@@ -794,7 +898,7 @@ function App() {
                   batchMode ? clsx(t.accentBg, "text-white") : clsx(t.textMuted, "hover:opacity-100")
                 )}
               >
-                <span>{batchMode ? '完成多选' : '多选'}</span>
+                <span>{batchMode ? (locale === 'en-US' ? 'Done' : '完成多选') : tr('search.batchSelect')}</span>
               </button>
             </div>
           </div>
@@ -802,7 +906,7 @@ function App() {
           {/* Workspace Filter Dropdown */}
           {dbStats?.workspaces && dbStats.workspaces.length > 1 && (
             <div className="mt-2 flex items-center space-x-2 text-[11px]">
-              <span className={clsx("shrink-0", t.textMuted)}>工作区:</span>
+              <span className={clsx("shrink-0", t.textMuted)}>{locale === 'en-US' ? 'Workspace:' : '工作区:'}</span>
               <select
                 value={workspaceFilter}
                 onChange={e => setWorkspaceFilter(e.target.value)}
@@ -811,7 +915,7 @@ function App() {
                   t.inputBg, t.inputBorder, t.textPrimary
                 )}
               >
-                <option value="all">全部工作区 ({allSessions.length})</option>
+                <option value="all">{tr('search.allWorkspaces')} ({allSessions.length})</option>
                 {dbStats.workspaces?.map(ws => (
                   <option key={ws} value={ws}>
                     {ws.split('/').slice(-2).join('/')}
@@ -835,7 +939,7 @@ function App() {
                   : clsx(t.textMuted, "hover:opacity-100")
               )}
             >
-              主任务 ({rootSessions.length})
+              {tr('search.mainTasks')} ({rootSessions.length})
             </button>
             <button
               onClick={() => setFilterMode('with_subagents')}
@@ -846,7 +950,7 @@ function App() {
                   : clsx(t.textMuted, "hover:opacity-100")
               )}
             >
-              含子任务
+              {tr('search.subTasks')}
             </button>
             <button
               onClick={() => setFilterMode('all')}
@@ -857,7 +961,7 @@ function App() {
                   : clsx(t.textMuted, "hover:opacity-100")
               )}
             >
-              全量 ({allSessions.length})
+              {tr('search.allSessions')} ({allSessions.length})
             </button>
           </div>
         </div>
@@ -1061,10 +1165,10 @@ function App() {
                         "px-2.5 py-1 rounded text-[11px] font-medium transition-all flex items-center space-x-1.5",
                         viewMode === 'stream' ? "bg-zinc-800 border border-zinc-700 text-zinc-100 font-semibold shadow-xs" : clsx(t.textMuted, "hover:text-zinc-200")
                       )}
-                      title="连续流式视图 (滚动阅览)"
+                      title="连续流式视图"
                     >
                       <AlignLeft className="w-3.5 h-3.5" />
-                      <span>流式视图</span>
+                      <span>{tr('view.stream')}</span>
                     </button>
                     <button
                       onClick={() => setViewMode('card')}
@@ -1072,10 +1176,10 @@ function App() {
                         "px-2.5 py-1 rounded text-[11px] font-medium transition-all flex items-center space-x-1.5",
                         viewMode === 'card' ? "bg-zinc-800 border border-zinc-700 text-zinc-100 font-semibold shadow-xs" : clsx(t.textMuted, "hover:text-zinc-200")
                       )}
-                      title="轮次卡片视图 (快捷键 ⌥↑ / ⌥↓ 翻轮)"
+                      title="轮次卡片视图 (⌥↑ / ⌥↓)"
                     >
                       <Layers className="w-3.5 h-3.5" />
-                      <span>轮次卡片</span>
+                      <span>{tr('view.card')}</span>
                     </button>
                   </div>
 
@@ -1085,19 +1189,19 @@ function App() {
                       "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center space-x-1.5 border",
                       showOutline ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/40" : clsx(t.tagBg, t.tagText, t.border)
                     )}
-                    title="展开/收起会话轮次大纲面板 (快捷键 ⌘O)"
+                    title="展开/收起大纲 (⌘O)"
                   >
                     <Layers className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>大纲 ({(transcriptData as any)?.turns?.length || 0})</span>
+                    <span>{tr('view.outline', { count: (transcriptData as any)?.turns?.length || 0 })}</span>
                   </button>
 
                   <button
                     onClick={handleCopyHandoff}
                     className={clsx("px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5 border", t.tagBg, t.tagText, t.border)}
-                    title="复制用于无损迁移至其他模型的结构化提示词"
+                    title={tr('view.handoffBtn')}
                   >
                     <Share2 className={clsx("w-3.5 h-3.5", t.accentText)} />
-                    <span>复制交接提示词</span>
+                    <span>{tr('view.handoffBtn')}</span>
                   </button>
 
                   <button
@@ -1106,7 +1210,7 @@ function App() {
                       "p-1.5 rounded-lg text-xs transition-colors border",
                       showInspector ? clsx(t.cardActiveBg, t.textPrimary, t.cardBorderActive) : clsx(t.tagBg, t.tagText, t.border)
                     )}
-                    title={showInspector ? "隐藏资产与交接面板" : "显示资产与交接面板"}
+                    title={tr('view.toggleDrawer')}
                   >
                     {showInspector ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
                   </button>
@@ -1118,17 +1222,17 @@ function App() {
                 <div className="flex items-center space-x-2 truncate">
                   <span className={clsx("font-mono truncate max-w-sm flex items-center gap-1.5", t.textSecondary)} title={currentSessionMeta?.directory || currentSessionMeta?.workspace}>
                     <Folder className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                    <span>{currentSessionMeta?.directory || currentSessionMeta?.workspace || '工程目录'}</span>
+                    <span>{currentSessionMeta?.directory || currentSessionMeta?.workspace || (locale === 'en-US' ? 'Workspace' : '工程目录')}</span>
                   </span>
                   <span>•</span>
                   <span>
-                    显示 {pagedMessages.length} / {displayMessages.length} 消息
+                    {locale === 'en-US' ? `Showing ${pagedMessages.length} / ${displayMessages.length} Messages` : `显示 ${pagedMessages.length} / ${displayMessages.length} 消息`}
                   </span>
                   {transcriptData && transcriptData.descendantCount > 0 && (
                     <>
                       <span>•</span>
                       <span className={clsx("font-medium", t.accentText)}>
-                        聚合 {transcriptData.descendantCount} 个子任务 Agent
+                        {locale === 'en-US' ? `Merged ${transcriptData.descendantCount} Subagent Tasks` : `聚合 ${transcriptData.descendantCount} 个子任务 Agent`}
                       </span>
                     </>
                   )}
@@ -1151,7 +1255,7 @@ function App() {
                 <Search className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
                 <input 
                   type="text"
-                  placeholder="在当前对话中检索内容或工具..."
+                  placeholder={tr('view.searchInChat')}
                   value={inSessionSearch}
                   onChange={e => setInSessionSearch(e.target.value)}
                   className={clsx("w-full bg-transparent placeholder-zinc-500 focus:outline-none text-xs", t.textPrimary)}
@@ -1165,31 +1269,31 @@ function App() {
 
               {/* Message Filter Segmented Control */}
               <div className="flex items-center space-x-2 text-[11px]">
-                <span className={t.textMuted}>过滤展示:</span>
+                <span className={t.textMuted}>{locale === 'en-US' ? 'Filter:' : '过滤展示:'}</span>
                 <div className={clsx("flex items-center p-0.5 rounded-lg border", t.inputBg, t.border)}>
                   <button
                     onClick={() => setMsgFilter('all')}
                     className={clsx("px-2.5 py-0.5 rounded text-[10px] font-medium transition-colors", msgFilter === 'all' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
                   >
-                    全部 ({displayMessages.length})
+                    {tr('view.filterAll')} ({displayMessages.length})
                   </button>
                   <button
                     onClick={() => setMsgFilter('qa_only')}
                     className={clsx("px-2.5 py-0.5 rounded text-[10px] font-medium transition-colors", msgFilter === 'qa_only' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
                   >
-                    仅主问答
+                    {tr('view.filterQna')}
                   </button>
                   <button
                     onClick={() => setMsgFilter('tools_only')}
                     className={clsx("px-2.5 py-0.5 rounded text-[10px] font-medium transition-colors", msgFilter === 'tools_only' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
                   >
-                    含工具
+                    {tr('view.filterTools')}
                   </button>
                   <button
                     onClick={() => setMsgFilter('thoughts_only')}
                     className={clsx("px-2.5 py-0.5 rounded text-[10px] font-medium transition-colors", msgFilter === 'thoughts_only' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
                   >
-                    含思考
+                    {tr('view.filterThought')}
                   </button>
                 </div>
               </div>
@@ -1215,10 +1319,10 @@ function App() {
                         ? "opacity-35 cursor-not-allowed border-zinc-800 text-zinc-600" 
                         : clsx(t.buttonSecondary, "hover:border-zinc-600 active:scale-95")
                     )}
-                    title="上一轮交互 (⌥↑)"
+                    title="上一轮 (⌥↑)"
                   >
                     <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
-                    <span className="whitespace-nowrap">上一轮</span>
+                    <span className="whitespace-nowrap">{tr('view.prevTurn')}</span>
                     <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700/60 font-mono text-zinc-400">⌥↑</kbd>
                   </button>
 
@@ -1234,9 +1338,9 @@ function App() {
                         ? "opacity-35 cursor-not-allowed border-zinc-800 text-zinc-600" 
                         : clsx(t.buttonSecondary, "hover:border-zinc-600 active:scale-95")
                     )}
-                    title="下一轮交互 (⌥↓)"
+                    title="下一轮 (⌥↓)"
                   >
-                    <span className="whitespace-nowrap">下一轮</span>
+                    <span className="whitespace-nowrap">{tr('view.nextTurn')}</span>
                     <ChevronRight className="w-3.5 h-3.5 shrink-0" />
                     <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700/60 font-mono text-zinc-400">⌥↓</kbd>
                   </button>
@@ -1262,7 +1366,7 @@ function App() {
                         .trim()
                       return (
                         <option key={turnItem.turnIndex} value={turnItem.turnIndex} className="bg-zinc-900 text-zinc-200">
-                          第 {turnItem.turnIndex} 轮: {clean.slice(0, 50) || `交互 #${turnItem.turnIndex}`}{clean.length > 50 ? '...' : ''}
+                          {locale === 'en-US' ? `Turn ${turnItem.turnIndex}: ` : `第 ${turnItem.turnIndex} 轮: `}{clean.slice(0, 50) || `交互 #${turnItem.turnIndex}`}{clean.length > 50 ? '...' : ''}
                         </option>
                       )
                     })}
@@ -1275,7 +1379,7 @@ function App() {
                   <span className={clsx("px-2.5 py-1 rounded-md border text-[11px]", t.tagBg, t.tagText, t.border)}>
                     <strong className={clsx("font-bold", t.accentText)}>{currentTurnIndex}</strong>
                     <span className="opacity-40 mx-1">/</span>
-                    <span>{(transcriptData as any).turns.length} 轮</span>
+                    <span>{(transcriptData as any).turns.length} {locale === 'en-US' ? 'Turns' : '轮'}</span>
                   </span>
                 </div>
               </div>
@@ -1286,7 +1390,7 @@ function App() {
               {loading ? (
                 <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-3">
                   <Loader2 className="w-7 h-7 animate-spin text-zinc-400" />
-                  <p className="text-xs">正在解析并加载会话轨迹...</p>
+                  <p className="text-xs">{tr('view.loadingTranscript')}</p>
                 </div>
               ) : viewMode === 'card' && (transcriptData as any)?.turns && (transcriptData as any).turns.length > 0 ? (
                 /* CC-Switch Turn Card View */
@@ -1300,11 +1404,30 @@ function App() {
                         key={activeTurn.turnId}
                         turn={activeTurn}
                         totalTurns={turnsList.length}
-                        theme={theme}
+                        theme={effectiveTheme}
+                        locale={locale}
                         workspacePath={currentSessionMeta?.directory || currentSessionMeta?.workspace}
                         onOpenInFolder={(p) => (window as any).api.openInFolder(p)}
-                        onFullScreenCode={(code, lang) => setFullscreenModal({ open: true, code, lang })}
-                        onImageClick={() => {}}
+                        onFullScreenCode={(code, lang) => {
+                          setPreviewModalData({
+                            path: 'Snippet',
+                            name: 'Code Snippet',
+                            isText: true,
+                            content: code,
+                            ext: lang
+                          })
+                          setPreviewModalOpen(true)
+                        }}
+                        onPreviewFile={handlePreviewFile}
+                        onImageClick={(src, alt) => {
+                          setPreviewModalData({
+                            path: src,
+                            name: alt || 'Image',
+                            isImage: true,
+                            dataUrl: src
+                          })
+                          setPreviewModalOpen(true)
+                        }}
                         onNextTurn={() => {
                           setCurrentTurnIndex(prev => Math.min(turnsList.length, prev + 1))
                           document.getElementById('message-feed-container')?.scrollTo({ top: 0, behavior: 'instant' })
@@ -1492,34 +1615,64 @@ function App() {
                                 return (
                                   <div className="space-y-2">
                                     <MarkdownRenderer 
-                                      content={sanitized.cleanText || '(空用户指令)'}
+                                      content={sanitized.cleanText || (locale === 'en-US' ? '(Empty user prompt)' : '(空用户指令)')}
                                       workspacePath={currentSessionMeta?.directory || currentSessionMeta?.workspace}
-                                      onOpenFullscreen={(code, lang) => setFullscreenModal({ open: true, code, lang })}
+                                      theme={effectiveTheme}
+                                      onPreviewFile={handlePreviewFile}
+                                      onImageClick={(src, alt) => {
+                                        setPreviewModalData({
+                                          path: src,
+                                          name: alt || 'Image',
+                                          isImage: true,
+                                          dataUrl: src
+                                        })
+                                        setPreviewModalOpen(true)
+                                      }}
+                                      onOpenFullscreen={(code, lang) => {
+                                        setPreviewModalData({
+                                          path: 'Snippet',
+                                          name: 'Code Snippet',
+                                          isText: true,
+                                          content: code,
+                                          ext: lang
+                                        })
+                                        setPreviewModalOpen(true)
+                                      }}
+                                      onFullScreenCode={(code, lang) => {
+                                        setPreviewModalData({
+                                          path: 'Snippet',
+                                          name: 'Code Snippet',
+                                          isText: true,
+                                          content: code,
+                                          ext: lang
+                                        })
+                                        setPreviewModalOpen(true)
+                                      }}
                                     />
                                     {sanitized.hasEnvelopes && (
                                       <div className="pt-1">
                                         <details className="text-[11px] font-mono text-zinc-400 bg-black/20 rounded-lg p-2 border border-white/5">
                                           <summary className="cursor-pointer text-[10px] text-zinc-400 hover:text-zinc-200 font-sans font-medium select-none flex items-center gap-1.5">
                                             <Sliders className="w-3 h-3 text-zinc-400" />
-                                            <span>环境元数据与包装上下文</span>
-                                            <span className="text-zinc-500 font-mono text-[9px]">(已提取核心指令)</span>
+                                            <span>{tr('turn.envContext')}</span>
+                                            <span className="text-zinc-500 font-mono text-[9px]">{tr('turn.coreExtracted')}</span>
                                           </summary>
                                           <div className="mt-2 space-y-2 border-t border-white/5 pt-2">
                                             {sanitized.contextSummary && (
                                               <div>
-                                                <div className="text-[9px] text-indigo-400 font-sans font-semibold mb-0.5">上下文摘要：</div>
+                                                <div className="text-[9px] text-indigo-400 font-sans font-semibold mb-0.5">{tr('turn.contextSummary')}:</div>
                                                 <div className="whitespace-pre-wrap text-[10px] text-zinc-300 font-sans bg-black/30 p-2 rounded border border-white/5">{sanitized.contextSummary}</div>
                                               </div>
                                             )}
                                             {sanitized.metadata && (
                                               <div>
-                                                <div className="text-[9px] text-amber-400 font-sans font-semibold mb-0.5">运行时元数据：</div>
+                                                <div className="text-[9px] text-amber-400 font-sans font-semibold mb-0.5">{tr('turn.runtimeMetadata')}:</div>
                                                 <pre className="whitespace-pre-wrap text-[10px] text-zinc-400 bg-black/30 p-2 rounded border border-white/5 overflow-x-auto">{sanitized.metadata}</pre>
                                               </div>
                                             )}
                                             {sanitized.systemMessage && (
                                               <div>
-                                                <div className="text-[9px] text-emerald-400 font-sans font-semibold mb-0.5">系统消息：</div>
+                                                <div className="text-[9px] text-emerald-400 font-sans font-semibold mb-0.5">{tr('turn.systemMessage')}:</div>
                                                 <pre className="whitespace-pre-wrap text-[10px] text-zinc-400 bg-black/30 p-2 rounded border border-white/5 overflow-x-auto">{sanitized.systemMessage}</pre>
                                               </div>
                                             )}
@@ -1534,13 +1687,43 @@ function App() {
                                 <MarkdownRenderer 
                                   content={content}
                                   workspacePath={currentSessionMeta?.directory || currentSessionMeta?.workspace}
-                                  onOpenFullscreen={(code, lang) => setFullscreenModal({ open: true, code, lang })}
+                                  theme={effectiveTheme}
+                                  onPreviewFile={handlePreviewFile}
+                                  onImageClick={(src, alt) => {
+                                    setPreviewModalData({
+                                      path: src,
+                                      name: alt || 'Image',
+                                      isImage: true,
+                                      dataUrl: src
+                                    })
+                                    setPreviewModalOpen(true)
+                                  }}
+                                  onOpenFullscreen={(code, lang) => {
+                                    setPreviewModalData({
+                                      path: 'Snippet',
+                                      name: 'Code Snippet',
+                                      isText: true,
+                                      content: code,
+                                      ext: lang
+                                    })
+                                    setPreviewModalOpen(true)
+                                  }}
+                                  onFullScreenCode={(code, lang) => {
+                                    setPreviewModalData({
+                                      path: 'Snippet',
+                                      name: 'Code Snippet',
+                                      isText: true,
+                                      content: code,
+                                      ext: lang
+                                    })
+                                    setPreviewModalOpen(true)
+                                  }}
                                 />
                               )
                             })()
                           ) : (
                             !hasTools && !thought && (
-                              <div className={clsx("italic", t.textMuted)}>（该消息无文本内容）</div>
+                              <div className={clsx("italic", t.textMuted)}>{tr('view.noContent')}</div>
                             )
                           )}
                         </div>
@@ -1589,16 +1772,18 @@ function App() {
         ) : (
           <div className={clsx("flex-1 flex flex-col items-center justify-center p-8", t.textMuted)}>
             <Logo className="w-16 h-16 mb-4 opacity-80" />
-            <h3 className={clsx("text-base font-bold", t.textPrimary)}>选择或导入一个会话以开始</h3>
+            <h3 className={clsx("text-base font-bold", t.textPrimary)}>
+              {locale === 'en-US' ? 'Select or import a session to begin' : '选择或导入一个会话以开始'}
+            </h3>
             <p className={clsx("text-xs mt-1 max-w-sm text-center leading-relaxed", t.textMuted)}>
-              支持 ZCode、OpenCode、Codex、Pi.ai、Claude Code、反重力等全部生态格式无损互转与会话接力。
+              {locale === 'en-US' ? 'Lossless format conversion and handoff across ZCode, OpenCode, Codex, Pi, Claude Code, and Antigravity.' : '支持 ZCode、OpenCode、Codex、Pi.ai、Claude Code、反重力等全部生态格式无损互转与会话接力。'}
             </p>
             <button
               onClick={handleImportSession}
               className={clsx("mt-4 px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all shadow-md flex items-center space-x-2", t.accentBg)}
             >
               <UploadCloud className="w-4 h-4" />
-              <span>导入外部会话 (.jsonl / .json / .md)</span>
+              <span>{locale === 'en-US' ? 'Import Session (.jsonl / .json / .md)' : '导入外部会话 (.jsonl / .json / .md)'}</span>
             </button>
           </div>
         )}
@@ -1618,7 +1803,7 @@ function App() {
             <div className="flex items-center space-x-2">
               <Wrench className={clsx("w-4 h-4", t.accentText)} />
               <h3 className={clsx("text-xs font-semibold", t.textPrimary)}>
-                会话资产与交接中心
+                {tr('handoff.title')}
               </h3>
             </div>
             <button 
@@ -1636,28 +1821,28 @@ function App() {
               className={clsx("py-1.5 rounded transition-colors flex items-center justify-center gap-1", inspectorTab === 'handoff' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
             >
               <ArrowRightLeft className="w-3 h-3" />
-              <span>上下文交接</span>
+              <span>{tr('handoff.tabHandoff')}</span>
             </button>
             <button
               onClick={() => setInspectorTab('files')}
               className={clsx("py-1.5 rounded transition-colors flex items-center justify-center gap-1", inspectorTab === 'files' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
             >
               <FileCode className="w-3 h-3" />
-              <span>变更文件 ({analytics?.modifiedFiles.length || 0})</span>
+              <span>{tr('handoff.tabFiles', { count: String(analytics?.modifiedFiles.length || 0) })}</span>
             </button>
             <button
               onClick={() => setInspectorTab('tools')}
               className={clsx("py-1.5 rounded transition-colors flex items-center justify-center gap-1", inspectorTab === 'tools' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
             >
               <Terminal className="w-3 h-3" />
-              <span>工具统计</span>
+              <span>{tr('handoff.tabTools')}</span>
             </button>
             <button
               onClick={() => setInspectorTab('export')}
               className={clsx("py-1.5 rounded transition-colors flex items-center justify-center gap-1", inspectorTab === 'export' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
             >
               <Download className="w-3 h-3" />
-              <span>数据导出</span>
+              <span>{tr('handoff.tabExport')}</span>
             </button>
           </div>
 
@@ -1669,34 +1854,34 @@ function App() {
                 <div className={clsx("p-3 rounded-xl border text-xs space-y-2", t.cardBg, t.border)}>
                   <div className={clsx("flex items-center space-x-1.5 font-semibold", t.accentText)}>
                     <FileText className="w-3.5 h-3.5" />
-                    <span>跨模型任务交接 (Handoff)</span>
+                    <span>{tr('handoff.handoffBanner')}</span>
                   </div>
                   <p className={clsx("text-[11px] leading-relaxed", t.textSecondary)}>
-                    汇总会话工程根目录、<strong>已变更的 {analytics?.modifiedFiles.length || 0} 个文件</strong>、关键执行结论与最近交互，生成可直接无缝粘贴至新模型或 Agent 的结构化 Markdown 提示词。
+                    {tr('handoff.handoffDesc', { count: String(analytics?.modifiedFiles.length || 0) })}
                   </p>
                   <button
                     onClick={handleCopyHandoff}
                     className={clsx("w-full py-2 text-white rounded-lg font-medium text-xs transition-colors flex items-center justify-center space-x-1.5 shadow-sm", t.accentBg)}
                   >
                     <Copy className="w-3.5 h-3.5" />
-                    <span>复制交接提示词 (Markdown)</span>
+                    <span>{tr('handoff.copyPromptBtn')}</span>
                   </button>
                 </div>
 
                 <div className={clsx("p-3 rounded-xl border space-y-2 text-xs", t.cardBg, t.border)}>
-                  <span className={clsx("font-semibold", t.textPrimary)}>交接提示词包含：</span>
+                  <span className={clsx("font-semibold", t.textPrimary)}>{tr('handoff.handoffDetailsTitle')}</span>
                   <ul className={clsx("text-[11px] space-y-1.5 pl-3 list-disc", t.textSecondary)}>
-                    <li>工作区绝对路径与前置任务背景</li>
-                    <li>{analytics?.modifiedFiles.length || 0} 个已修改代码/文档完整路径</li>
-                    <li>{analytics?.subagentCount || 0} 个子任务 Agent 的执行结论</li>
-                    <li>最近关键轮次的用户诉求与工具回执</li>
+                    <li>{tr('handoff.itemWorkspace')}</li>
+                    <li>{tr('handoff.itemFiles', { count: String(analytics?.modifiedFiles.length || 0) })}</li>
+                    <li>{tr('handoff.itemSubagents', { count: String(analytics?.subagentCount || 0) })}</li>
+                    <li>{tr('handoff.itemRecent')}</li>
                   </ul>
                   <button
                     onClick={() => handleExport('handoff')}
                     className={clsx("w-full mt-2 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center space-x-1.5 border", t.tagBg, t.tagText, t.border)}
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>另存为 `_handoff_prompt.md`</span>
+                    <span>{tr('handoff.savePromptBtn')}</span>
                   </button>
                 </div>
               </div>
@@ -1709,7 +1894,7 @@ function App() {
                   <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="过滤修改的文件名..."
+                    placeholder={locale === 'en-US' ? "Filter modified files..." : "过滤修改的文件名..."}
                     value={fileSearch}
                     onChange={e => setFileSearch(e.target.value)}
                     className={clsx("w-full border rounded-lg pl-8 pr-2 py-1.5 text-xs placeholder-zinc-500 focus:outline-none", t.inputBg, t.inputBorder, t.textPrimary)}
@@ -1718,7 +1903,7 @@ function App() {
 
                 <div className="space-y-1.5 max-h-[60vh] overflow-y-auto custom-scrollbar">
                   {filteredModifiedFiles.length === 0 ? (
-                    <div className={clsx("p-4 text-center text-xs", t.textMuted)}>无修改文件记录</div>
+                    <div className={clsx("p-4 text-center text-xs", t.textMuted)}>{tr('handoff.modifiedFilesEmpty')}</div>
                   ) : (
                     filteredModifiedFiles.map((file, fIdx) => {
                       const baseName = file.split('/').pop()
@@ -1726,13 +1911,22 @@ function App() {
                       return (
                         <div
                           key={fIdx}
-                          onClick={() => copyText(file, `file-${fIdx}`)}
-                          className={clsx("p-2 border rounded-lg cursor-pointer transition-colors text-left group", t.cardBg, t.border)}
-                          title="点击复制文件绝对路径"
+                          onClick={() => handlePreviewFile(file)}
+                          className={clsx("p-2 border rounded-lg cursor-pointer transition-all text-left group hover:border-indigo-500/50 hover:shadow-sm", t.cardBg, t.border)}
+                          title={locale === 'en-US' ? "Click to preview file" : "点击预览文件"}
                         >
                           <div className="flex items-center justify-between">
-                            <span className={clsx("font-mono text-xs font-medium truncate", t.textPrimary)}>{baseName}</span>
-                            <Copy className="w-3 h-3 text-zinc-500 group-hover:text-zinc-300 shrink-0 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <span className={clsx("font-mono text-xs font-medium truncate flex-1", t.textPrimary)}>{baseName}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                copyText(file, `file-${fIdx}`)
+                              }}
+                              className="p-1 hover:bg-white/10 rounded text-zinc-500 group-hover:text-zinc-300 shrink-0 ml-1 transition-colors"
+                              title={locale === 'en-US' ? "Copy path" : "复制路径"}
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
                           </div>
                           <div className={clsx("font-mono text-[9px] truncate mt-0.5", t.textMuted)}>{dirName}</div>
                         </div>
@@ -1747,16 +1941,20 @@ function App() {
             {inspectorTab === 'tools' && (
               <div className="space-y-3">
                 <div className={clsx("p-3 border rounded-xl space-y-2", t.cardBg, t.border)}>
-                  <div className={clsx("text-xs font-semibold", t.textPrimary)}>工具调用频率统计</div>
+                  <div className={clsx("text-xs font-semibold", t.textPrimary)}>{locale === 'en-US' ? 'Tool Call Frequency' : '工具调用频率统计'}</div>
                   <div className="space-y-2 mt-2">
-                    {analytics && Object.entries(analytics.toolStats).map(([tool, count]) => (
-                      <div key={tool} className="flex items-center justify-between text-xs font-mono">
-                        <span className={clsx("truncate max-w-[180px]", t.textSecondary)}>{tool}</span>
-                        <div className="flex items-center space-x-2">
-                          <span className={clsx("font-semibold", t.textPrimary)}>{count} 次</span>
+                    {analytics && Object.entries(analytics.toolStats).length > 0 ? (
+                      Object.entries(analytics.toolStats).map(([tool, count]) => (
+                        <div key={tool} className="flex items-center justify-between text-xs font-mono">
+                          <span className={clsx("truncate max-w-[180px]", t.textSecondary)}>{tool}</span>
+                          <div className="flex items-center space-x-2">
+                            <span className={clsx("font-semibold", t.textPrimary)}>{count} {locale === 'en-US' ? 'calls' : '次'}</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <div className={clsx("p-2 text-center text-xs", t.textMuted)}>{tr('handoff.toolStatsEmpty')}</div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1783,14 +1981,14 @@ function App() {
                       className={clsx("flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center space-x-1 border", t.tagBg, t.tagText, t.border)}
                     >
                       <Eye className="w-3 h-3" />
-                      <span>预览内容</span>
+                      <span>{locale === 'en-US' ? 'Preview' : '预览内容'}</span>
                     </button>
                     <button
                       onClick={() => handleExport('opencode')}
                       className="flex-1 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center space-x-1 shadow-sm"
                     >
                       <Download className="w-3 h-3" />
-                      <span>导出文件</span>
+                      <span>{locale === 'en-US' ? 'Export' : '导出文件'}</span>
                     </button>
                   </div>
                 </div>
@@ -1813,14 +2011,14 @@ function App() {
                       className={clsx("flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center space-x-1 border", t.tagBg, t.tagText, t.border)}
                     >
                       <Eye className="w-3 h-3" />
-                      <span>预览内容</span>
+                      <span>{locale === 'en-US' ? 'Preview' : '预览内容'}</span>
                     </button>
                     <button
                       onClick={() => handleExport('codex')}
                       className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center space-x-1 shadow-sm"
                     >
                       <Download className="w-3 h-3" />
-                      <span>导出文件</span>
+                      <span>{locale === 'en-US' ? 'Export' : '导出文件'}</span>
                     </button>
                   </div>
                 </div>
@@ -1843,14 +2041,14 @@ function App() {
                       className={clsx("flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center space-x-1 border", t.tagBg, t.tagText, t.border)}
                     >
                       <Eye className="w-3 h-3" />
-                      <span>预览内容</span>
+                      <span>{locale === 'en-US' ? 'Preview' : '预览内容'}</span>
                     </button>
                     <button
                       onClick={() => handleExport('pi')}
                       className="flex-1 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center space-x-1 shadow-sm"
                     >
                       <Download className="w-3 h-3" />
-                      <span>导出文件</span>
+                      <span>{locale === 'en-US' ? 'Export' : '导出文件'}</span>
                     </button>
                   </div>
                 </div>
@@ -1873,14 +2071,14 @@ function App() {
                       className={clsx("flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center space-x-1 border", t.tagBg, t.tagText, t.border)}
                     >
                       <Eye className="w-3 h-3" />
-                      <span>预览内容</span>
+                      <span>{locale === 'en-US' ? 'Preview' : '预览内容'}</span>
                     </button>
                     <button
                       onClick={() => handleExport('claude')}
                       className="flex-1 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center space-x-1 shadow-sm"
                     >
                       <Download className="w-3 h-3" />
-                      <span>导出文件</span>
+                      <span>{locale === 'en-US' ? 'Export' : '导出文件'}</span>
                     </button>
                   </div>
                 </div>
@@ -1903,14 +2101,14 @@ function App() {
                       className={clsx("flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center space-x-1 border", t.tagBg, t.tagText, t.border)}
                     >
                       <Eye className="w-3 h-3" />
-                      <span>预览内容</span>
+                      <span>{locale === 'en-US' ? 'Preview' : '预览内容'}</span>
                     </button>
                     <button
                       onClick={() => handleExport('antigravity')}
                       className="flex-1 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center space-x-1 shadow-sm"
                     >
                       <Download className="w-3 h-3" />
-                      <span>导出文件</span>
+                      <span>{locale === 'en-US' ? 'Export' : '导出文件'}</span>
                     </button>
                   </div>
                 </div>
@@ -1933,14 +2131,14 @@ function App() {
                       className={clsx("flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center space-x-1 border", t.tagBg, t.tagText, t.border)}
                     >
                       <Eye className="w-3 h-3" />
-                      <span>预览内容</span>
+                      <span>{locale === 'en-US' ? 'Preview' : '预览内容'}</span>
                     </button>
                     <button
                       onClick={() => handleExport('md')}
                       className="flex-1 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg text-xs font-medium transition-colors flex items-center justify-center space-x-1 shadow-sm"
                     >
                       <Download className="w-3 h-3" />
-                      <span>导出文件</span>
+                      <span>{locale === 'en-US' ? 'Export' : '导出文件'}</span>
                     </button>
                   </div>
                 </div>

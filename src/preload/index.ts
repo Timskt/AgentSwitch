@@ -14,6 +14,9 @@ const api = {
   selectCustomDb: () => ipcRenderer.invoke('select-custom-db'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   openInFolder: (filePath: string) => ipcRenderer.invoke('open-in-folder', filePath),
+  openInEditor: (filePath: string) => ipcRenderer.invoke('open-in-editor', filePath),
+  readFilePreview: (targetPath: string, workspacePath?: string) => 
+    ipcRenderer.invoke('read-file-preview', { targetPath, workspacePath }),
   openExternalUrl: (url: string) => ipcRenderer.invoke('open-external-url', url),
   exportFile: (data: { filename: string, content: string }) => ipcRenderer.invoke('export-file', data),
   scanLocalEcosystem: () => ipcRenderer.invoke('scan-local-ecosystem'),

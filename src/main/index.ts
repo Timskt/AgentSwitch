@@ -426,6 +426,135 @@ app.whenReady().then(() => {
     return { success: true }
   })
 
+  ipcMain.handle('open-in-editor', async (_, rawPath) => {
+    if (!rawPath || typeof rawPath !== 'string') return { success: false, error: 'invalid_path' }
+    try {
+      let clean = rawPath.trim().replace(/^[`'"]+|[`'"]+$/g, '')
+      if (clean.startsWith('file://')) {
+        clean = decodeURIComponent(clean.replace(/^file:\/\//, ''))
+      }
+      clean = clean.split('#')[0].split('?')[0]
+      if (clean.startsWith('~')) clean = path.join(os.homedir(), clean.slice(1))
+      clean = path.resolve(clean)
+
+      if (fs.existsSync(clean)) {
+        const err = await shell.openPath(clean)
+        if (err) {
+          shell.showItemInFolder(clean)
+        }
+        return { success: true, path: clean }
+      } else {
+        const parent = path.dirname(clean)
+        if (fs.existsSync(parent)) {
+          shell.showItemInFolder(parent)
+          return { success: true, path: parent }
+        }
+      }
+    } catch (err) {
+      console.warn('open-in-editor error:', err)
+    }
+    return { success: false, error: 'file_not_found' }
+  })
+
+  ipcMain.handle('read-file-preview', async (_, args: { targetPath: string, workspacePath?: string }) => {
+    if (!args || !args.targetPath || typeof args.targetPath !== 'string') {
+      return { success: false, reason: 'empty_path' }
+    }
+
+    try {
+      let raw = args.targetPath.trim().replace(/^[`'"]+|[`'"]+$/g, '')
+      if (raw.startsWith('file://')) {
+        raw = decodeURIComponent(raw.replace(/^file:\/\//, ''))
+      }
+      // Remove line numbers / anchors like #L10-L20
+      raw = raw.split('#')[0].split('?')[0]
+      if (raw.startsWith('~')) {
+        raw = path.join(os.homedir(), raw.slice(1))
+      }
+
+      let resolved = path.resolve(raw)
+
+      // Multi-tier resolution fallback if not found directly
+      if (!fs.existsSync(resolved) && args.workspacePath) {
+        let ws = args.workspacePath.trim()
+        if (ws.startsWith('~')) ws = path.join(os.homedir(), ws.slice(1))
+        ws = path.resolve(ws)
+
+        // Try relative to workspace
+        const wsCandidate = path.resolve(ws, raw.replace(/^\/+/, ''))
+        if (fs.existsSync(wsCandidate)) {
+          resolved = wsCandidate
+        } else {
+          // Try base filename in workspace
+          const baseName = path.basename(raw)
+          const baseCandidate = path.resolve(ws, baseName)
+          if (fs.existsSync(baseCandidate)) {
+            resolved = baseCandidate
+          }
+        }
+      }
+
+      // Check if target exists
+      if (!fs.existsSync(resolved)) {
+        return { success: false, reason: 'not_found', targetPath: args.targetPath, triedPath: resolved }
+      }
+
+      const stat = fs.statSync(resolved)
+      if (stat.isDirectory()) {
+        shell.showItemInFolder(resolved)
+        return { success: true, isDirectory: true, path: resolved, name: path.basename(resolved) }
+      }
+
+      const ext = path.extname(resolved).toLowerCase().replace(/^\./, '')
+      const isImage = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'ico'].includes(ext)
+
+      if (isImage) {
+        if (stat.size > 20 * 1024 * 1024) {
+          return { success: true, isOversized: true, isImage: true, path: resolved, size: stat.size, ext, name: path.basename(resolved) }
+        }
+        const mime = ext === 'svg' ? 'image/svg+xml' : `image/${ext === 'jpg' ? 'jpeg' : ext}`
+        const base64 = fs.readFileSync(resolved).toString('base64')
+        const dataUrl = `data:${mime};base64,${base64}`
+        return { success: true, isImage: true, path: resolved, dataUrl, size: stat.size, ext, name: path.basename(resolved) }
+      }
+
+      // Oversized file threshold: 2MB
+      if (stat.size > 2 * 1024 * 1024) {
+        return { success: true, isOversized: true, path: resolved, size: stat.size, ext, name: path.basename(resolved) }
+      }
+
+      // Safe text file read
+      const buf = fs.readFileSync(resolved)
+      // Check for binary null bytes
+      let isBinary = false
+      const checkLength = Math.min(buf.length, 1024)
+      for (let i = 0; i < checkLength; i++) {
+        if (buf[i] === 0) {
+          isBinary = true
+          break
+        }
+      }
+
+      if (isBinary) {
+        return { success: true, isBinary: true, path: resolved, size: stat.size, ext, name: path.basename(resolved) }
+      }
+
+      const content = buf.toString('utf-8')
+      return {
+        success: true,
+        isText: true,
+        content,
+        path: resolved,
+        size: stat.size,
+        ext,
+        name: path.basename(resolved)
+      }
+    } catch (err: any) {
+      console.warn('read-file-preview error:', err)
+      return { success: false, reason: 'error', error: String(err?.message || err) }
+    }
+  })
+
   ipcMain.handle('scan-local-ecosystem', () => {
     try {
       return { success: true, data: scanLocalEcosystem() }

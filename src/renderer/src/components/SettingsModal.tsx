@@ -1,17 +1,19 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { 
   X, Palette, Database, Sparkles, RefreshCw, Check, 
-  ExternalLink, Download, FolderOpen, Shield, Bell, CheckCircle2, Info
+  ExternalLink, Download, FolderOpen, Shield, Bell, CheckCircle2, Info, Languages, SunMoon
 } from 'lucide-react'
 import clsx from 'clsx'
-
-export type AppTheme = 'obsidian' | 'midnight' | 'solar' | 'light'
+import { AppThemeMode } from '../theme'
+import { translations, Locale } from '../i18n'
 
 interface SettingsModalProps {
   open: boolean
   onClose: () => void
-  currentTheme: AppTheme
-  onThemeChange: (theme: AppTheme) => void
+  currentThemeMode: AppThemeMode
+  onThemeModeChange: (mode: AppThemeMode) => void
+  locale: Locale
+  onLocaleChange: (locale: Locale) => void
   fontSize: number
   onFontSizeChange: (size: number) => void
   dbPath?: string
@@ -22,70 +24,102 @@ interface SettingsModalProps {
 export function SettingsModal({
   open,
   onClose,
-  currentTheme,
-  onThemeChange,
+  currentThemeMode,
+  onThemeModeChange,
+  locale,
+  onLocaleChange,
   fontSize,
   onFontSizeChange,
   dbPath,
   onSelectCustomDb,
   onRefreshDb
 }: SettingsModalProps) {
-  const [tab, setTab] = useState<'appearance' | 'database' | 'update' | 'about'>('appearance')
+  const [tab, setTab] = useState<'appearance' | 'language' | 'database' | 'update' | 'about'>('appearance')
   const [checkingUpdate, setCheckingUpdate] = useState(false)
   const [updateResult, setUpdateResult] = useState<any>(null)
   const [autoCheckUpdate, setAutoCheckUpdate] = useState(true)
+
+  const t = translations[locale]?.settings || translations['zh-CN'].settings
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && open) {
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [open, onClose])
 
   if (!open) return null
 
   const handleCheckUpdate = async () => {
     setCheckingUpdate(true)
-    // @ts-ignore
-    const res = await window.api.checkForUpdates()
-    setTimeout(() => {
-      setUpdateResult(res)
+    try {
+      // @ts-ignore
+      const res = await window.api.checkForUpdates()
+      setTimeout(() => {
+        setUpdateResult(res)
+        setCheckingUpdate(false)
+      }, 600)
+    } catch(e) {
       setCheckingUpdate(false)
-    }, 600)
+    }
   }
 
-  const themes: { id: AppTheme, name: string, desc: string, bg: string, border: string }[] = [
+  const themes: { id: AppThemeMode, name: string, desc: string, bg: string, border: string, icon?: React.ReactNode }[] = [
+    {
+      id: 'system',
+      name: t.themeFollowSystem,
+      desc: t.themeFollowSystemDesc,
+      bg: 'bg-gradient-to-r from-zinc-900 via-zinc-800 to-slate-200',
+      border: 'border-indigo-500/50',
+      icon: <SunMoon className="w-4 h-4 text-indigo-400 shrink-0" />
+    },
     {
       id: 'obsidian',
-      name: '黑曜石 (Obsidian Dark)',
-      desc: '默认高阶极客深色，深邃护眼且层次分明',
-      bg: 'bg-[#09090b]',
-      border: 'border-zinc-700'
+      name: t.themeObsidian,
+      desc: t.themeObsidianDesc,
+      bg: 'bg-[#0a0a0c]',
+      border: 'border-indigo-500/50'
     },
     {
       id: 'midnight',
-      name: '午夜极客 (Midnight Cyber)',
-      desc: '冷萃灰与石墨底色，对标 Linear / Zed 美学',
-      bg: 'bg-[#0f1117]',
-      border: 'border-slate-700'
+      name: t.themeMidnight,
+      desc: t.themeMidnightDesc,
+      bg: 'bg-[#0f1115]',
+      border: 'border-cyan-500/50'
     },
     {
       id: 'solar',
-      name: '暖灰木炭 (Solar Charcoal)',
-      desc: '温暖柔和的暗炭灰阶，极大缓解视觉疲劳',
-      bg: 'bg-[#181615]',
-      border: 'border-amber-900/40'
+      name: t.themeSolar,
+      desc: t.themeSolarDesc,
+      bg: 'bg-[#181614]',
+      border: 'border-amber-500/50'
     },
     {
       id: 'light',
-      name: '纸白极简 (Clean Light)',
-      desc: 'macOS 雅致高对比度浅色模式，白天阅读清晰自然',
-      bg: 'bg-[#f8fafc]',
+      name: t.themeLight,
+      desc: t.themeLightDesc,
+      bg: 'bg-[#ffffff]',
       border: 'border-slate-300'
     }
   ]
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in">
-      <div className="bg-[#121215] border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+    <div 
+      onClick={onClose}
+      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in"
+    >
+      <div 
+        onClick={e => e.stopPropagation()}
+        className="bg-[#121215] border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden"
+      >
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-[#18181b]">
           <div className="flex items-center space-x-2.5">
             <Palette className="w-4 h-4 text-indigo-400" />
-            <h2 className="text-sm font-semibold text-zinc-100">系统偏好设置 (Settings)</h2>
+            <h2 className="text-sm font-semibold text-zinc-100">{t.title}</h2>
           </div>
           <button 
             onClick={onClose}
@@ -96,34 +130,41 @@ export function SettingsModal({
         </div>
 
         {/* Modal Tabs Bar */}
-        <div className="flex border-b border-zinc-800 bg-zinc-900 px-6 space-x-6 text-xs font-medium">
+        <div className="flex border-b border-zinc-800 bg-zinc-900 px-6 space-x-6 text-xs font-medium overflow-x-auto">
           <button
             onClick={() => setTab('appearance')}
-            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5", tab === 'appearance' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
+            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5 shrink-0", tab === 'appearance' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
           >
             <Palette className="w-3.5 h-3.5" />
-            <span>外观与主题</span>
+            <span>{t.tabAppearance}</span>
+          </button>
+          <button
+            onClick={() => setTab('language')}
+            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5 shrink-0", tab === 'language' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
+          >
+            <Languages className="w-3.5 h-3.5" />
+            <span>{t.tabLanguage}</span>
           </button>
           <button
             onClick={() => setTab('database')}
-            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5", tab === 'database' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
+            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5 shrink-0", tab === 'database' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
           >
             <Database className="w-3.5 h-3.5" />
-            <span>本地数据库</span>
+            <span>{t.tabDatabase}</span>
           </button>
           <button
             onClick={() => setTab('update')}
-            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5", tab === 'update' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
+            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5 shrink-0", tab === 'update' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>自动更新</span>
+            <span>{t.tabUpdate}</span>
           </button>
           <button
             onClick={() => setTab('about')}
-            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5", tab === 'about' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
+            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5 shrink-0", tab === 'about' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
           >
             <Info className="w-3.5 h-3.5" />
-            <span>关于</span>
+            <span>{t.tabAbout}</span>
           </button>
         </div>
 
@@ -133,43 +174,58 @@ export function SettingsModal({
           {tab === 'appearance' && (
             <div className="space-y-5">
               <div>
-                <label className="text-xs font-semibold text-zinc-200 block mb-2">多皮肤主题选择</label>
+                <label className="text-xs font-semibold text-zinc-200 block mb-2">{t.themeTitle}</label>
                 <div className="grid grid-cols-2 gap-3">
-                  {themes.map(t => {
-                    const isSelected = currentTheme === t.id
+                  {themes.map(tm => {
+                    const isSelected = currentThemeMode === tm.id
                     return (
                       <div
-                        key={t.id}
-                        onClick={() => onThemeChange(t.id)}
+                        key={tm.id}
+                        onClick={() => onThemeModeChange(tm.id)}
                         className={clsx(
-                          "p-3 rounded-xl cursor-pointer border transition-all text-left relative",
-                          isSelected ? "border-indigo-500 bg-zinc-800/80 shadow-sm" : "border-zinc-800 bg-zinc-900/40 hover:bg-zinc-800/40"
+                          "p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-2 relative overflow-hidden group",
+                          isSelected 
+                            ? "bg-zinc-800/90 border-indigo-500 shadow-md ring-1 ring-indigo-500/50" 
+                            : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700"
                         )}
                       >
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="font-semibold text-zinc-200 text-xs">{t.name}</span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-indigo-400" />}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            {tm.icon || <div className={clsx("w-3.5 h-3.5 rounded-full border", tm.bg, tm.border)} />}
+                            <span className="font-medium text-zinc-100">{tm.name}</span>
+                          </div>
+                          {isSelected && (
+                            <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">
+                              <Check className="w-2.5 h-2.5 stroke-[3]" />
+                            </div>
+                          )}
                         </div>
-                        <p className="text-[11px] text-zinc-400 leading-relaxed">{t.desc}</p>
+                        <p className="text-[11px] text-zinc-400 leading-relaxed">{tm.desc}</p>
                       </div>
                     )
                   })}
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-zinc-800">
-                <label className="text-xs font-semibold text-zinc-200 block mb-2">字号大小设定</label>
+              <div className="pt-2 border-t border-zinc-800/80">
+                <label className="text-xs font-semibold text-zinc-200 block mb-2">{t.fontSizeTitle}</label>
                 <div className="flex items-center space-x-3">
-                  {[12, 13, 14, 15].map(sz => (
+                  {[
+                    { size: 12, label: t.fontSmall },
+                    { size: 13, label: t.fontMedium },
+                    { size: 14, label: t.fontLarge }
+                  ].map(f => (
                     <button
-                      key={sz}
-                      onClick={() => onFontSizeChange(sz)}
+                      key={f.size}
+                      onClick={() => onFontSizeChange(f.size)}
                       className={clsx(
-                        "px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors",
-                        fontSize === sz ? "bg-indigo-600 border-indigo-500 text-white" : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800"
+                        "px-4 py-2 rounded-lg border text-xs font-medium transition-all",
+                        fontSize === f.size 
+                          ? "bg-indigo-600 text-white border-indigo-500 shadow-sm" 
+                          : "bg-zinc-900 text-zinc-300 border-zinc-800 hover:border-zinc-700"
                       )}
                     >
-                      {sz}px {sz === 13 ? '(默认推荐)' : ''}
+                      {f.label}
                     </button>
                   ))}
                 </div>
@@ -177,99 +233,149 @@ export function SettingsModal({
             </div>
           )}
 
-          {/* Tab 2: Database */}
+          {/* Tab 2: Language */}
+          {tab === 'language' && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-zinc-200 block mb-1">{t.languageTitle}</label>
+                <p className="text-xs text-zinc-400 mb-4">{t.languageDesc}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: 'zh-CN' as Locale, label: t.langZh },
+                    { id: 'en-US' as Locale, label: t.langEn },
+                  ].map(l => {
+                    const isSelected = locale === l.id
+                    return (
+                      <button
+                        key={l.id}
+                        onClick={() => onLocaleChange(l.id)}
+                        className={clsx(
+                          "p-4 rounded-xl border transition-all text-left flex items-center justify-between",
+                          isSelected 
+                            ? "bg-zinc-800/90 border-indigo-500 shadow-md ring-1 ring-indigo-500/50" 
+                            : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-300"
+                        )}
+                      >
+                        <span className="font-semibold text-xs text-zinc-100">{l.label}</span>
+                        {isSelected && (
+                          <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Tab 3: Database */}
           {tab === 'database' && (
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-zinc-200 block mb-1.5">ZCode SQLite 存储位置</label>
-                <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl font-mono text-[11px] text-zinc-300 break-all leading-relaxed">
-                  {dbPath || '~/.zcode/cli/db/db.sqlite'}
+                <label className="text-xs font-semibold text-zinc-200 block mb-1">{t.dbTitle}</label>
+                <p className="text-xs text-zinc-400 mb-3">{t.dbDesc}</p>
+                <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-mono text-zinc-300 break-all select-all flex items-center justify-between">
+                  <span>{dbPath || '~/.local/share/opencode, ~/.codex, ~/.gemini/antigravity'}</span>
                 </div>
               </div>
 
               <div className="flex items-center space-x-3 pt-2">
                 <button
                   onClick={onSelectCustomDb}
-                  className="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5 border border-zinc-700"
+                  className="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-lg font-medium transition-colors flex items-center space-x-2"
                 >
-                  <FolderOpen className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>指定自定义 SQLite 备份文件...</span>
+                  <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>{t.customDbBtn}</span>
                 </button>
+
                 <button
                   onClick={onRefreshDb}
-                  className="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5 border border-zinc-700"
+                  className="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-lg font-medium transition-colors flex items-center space-x-2"
                 >
-                  <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>重新扫描数据库</span>
+                  <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>{t.refreshDbBtn}</span>
                 </button>
-              </div>
-
-              <div className="p-3.5 bg-zinc-900/40 border border-zinc-800/80 rounded-xl text-[11px] text-zinc-400 leading-relaxed flex items-start gap-2">
-                <Info className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
-                <span><strong>说明</strong>：系统默认只读连接当前用户的 ZCode 存储。如果您将旧电脑、外接硬盘或团队历史备份迁移到了其它文件夹，可以直接指定该路径进行分析与导出。</span>
               </div>
             </div>
           )}
 
-          {/* Tab 3: Update */}
+          {/* Tab 4: Updates */}
           {tab === 'update' && (
             <div className="space-y-4">
-              <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-zinc-100 text-xs">当前版本：v2.2.0 (Build 2026.09.17)</h3>
-                  <p className="text-[11px] text-zinc-400 mt-0.5">跨平台 Electron + React + SQLite 生产就绪发行版</p>
+              <div>
+                <label className="text-xs font-semibold text-zinc-200 block mb-1">{t.updateTitle}</label>
+                <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold text-zinc-200 text-xs">AgentSwitch v2.6.0</div>
+                      <div className="text-[11px] text-zinc-500">Release: 2026-09-18</div>
+                    </div>
+                    <button
+                      onClick={handleCheckUpdate}
+                      disabled={checkingUpdate}
+                      className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center space-x-2 text-xs shadow-sm"
+                    >
+                      <RefreshCw className={clsx("w-3 h-3", checkingUpdate && "animate-spin")} />
+                      <span>{checkingUpdate ? t.checkingUpdate : t.checkUpdateBtn}</span>
+                    </button>
+                  </div>
+
+                  {updateResult && (
+                    <div className="p-3 bg-zinc-950/80 rounded-lg border border-emerald-900/40 text-emerald-400 flex items-center space-x-2">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <span>{t.latestVersion.replace('{version}', 'v2.6.0')}</span>
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={handleCheckUpdate}
-                  disabled={checkingUpdate}
-                  className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5 shadow-sm"
-                >
-                  {checkingUpdate ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                  <span>{checkingUpdate ? '检查中...' : '检查最新版本'}</span>
-                </button>
               </div>
 
-              {updateResult && (
-                <div className="p-4 bg-emerald-950/20 border border-emerald-500/30 rounded-xl text-xs space-y-2 animate-in fade-in">
-                  <div className="flex items-center space-x-2 text-emerald-400 font-semibold">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>您已在使用最新版本 (v{updateResult.latestVersion})</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-300 leading-relaxed font-mono">
-                    {updateResult.releaseNotes}
-                  </p>
-                </div>
-              )}
-
-              <div className="flex items-center justify-between p-3 bg-zinc-900/40 border border-zinc-800 rounded-xl">
-                <div>
-                  <span className="font-medium text-zinc-200 block text-xs">自动检测版本更新</span>
-                  <span className="text-[11px] text-zinc-500">启动软件时自动检查 GitHub Release 通道</span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={autoCheckUpdate}
+              <div className="flex items-center space-x-2 text-xs text-zinc-400 pt-1">
+                <input 
+                  type="checkbox" 
+                  id="autoCheck"
+                  checked={autoCheckUpdate} 
                   onChange={e => setAutoCheckUpdate(e.target.checked)}
-                  className="w-4 h-4 rounded text-indigo-600 bg-zinc-800 border-zinc-700"
+                  className="rounded border-zinc-700 bg-zinc-800 text-indigo-600 focus:ring-0"
                 />
+                <label htmlFor="autoCheck" className="cursor-pointer select-none">{t.autoCheckLabel}</label>
               </div>
             </div>
           )}
 
-          {/* Tab 4: About */}
+          {/* Tab 5: About */}
           {tab === 'about' && (
             <div className="space-y-4">
-              <div className="p-4 bg-zinc-900/80 border border-zinc-800 rounded-xl space-y-2">
-                <h3 className="font-bold text-zinc-100 text-sm">OmniRelay v2.5 (灵跃中枢)</h3>
-                <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  专为 AI Agent 研发者构建的全生态会话记忆中继与跨平台互转工作台。自动嗅探探测本机 ZCode、Antigravity、OpenCode、Claude Code、Codex 等主流 Agent，支持全平台格式无损双向互转与 AI 接力提示词生成。
-                </p>
-              </div>
+              <div className="p-5 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                    AS
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-zinc-100">{t.aboutTitle}</h3>
+                    <p className="text-[11px] text-zinc-400">{t.aboutDesc}</p>
+                  </div>
+                </div>
 
-              <div className="text-[11px] text-zinc-500 space-y-1">
-                <div>引擎内核：Electron 39.8 + React 19 + TypeScript + Better-SQLite3</div>
-                <div>界面框架：TailwindCSS v3.4 + Lucide Icons</div>
-                <div>开源许可证：MIT License</div>
+                <div className="border-t border-zinc-800 pt-3 space-y-1.5 text-[11px] text-zinc-400 font-mono">
+                  <div className="flex justify-between">
+                    <span>{t.version}:</span>
+                    <span className="text-zinc-200">v2.6.0 (Build 2026.09.18)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Electron:</span>
+                    <span className="text-zinc-200">v39.2.6</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>React:</span>
+                    <span className="text-zinc-200">v19.2.1 (Vite v7.2.6)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>{t.license}:</span>
+                    <span className="text-zinc-200">MIT Open Source</span>
+                  </div>
+                </div>
               </div>
             </div>
           )}

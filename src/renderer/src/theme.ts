@@ -1,3 +1,4 @@
+export type AppThemeMode = 'system' | 'obsidian' | 'midnight' | 'solar' | 'light'
 export type AppTheme = 'obsidian' | 'midnight' | 'solar' | 'light'
 
 export interface ThemeColors {
@@ -33,6 +34,20 @@ export interface ThemeColors {
   badgeActive: string
   badgeInactive: string
   bgSidebar: string
+}
+
+export function getSystemTheme(): AppTheme {
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'obsidian' : 'light'
+  }
+  return 'obsidian'
+}
+
+export function resolveEffectiveTheme(mode: AppThemeMode): AppTheme {
+  if (mode === 'system') {
+    return getSystemTheme()
+  }
+  return mode
 }
 
 export const THEME_STYLES: Record<AppTheme, ThemeColors> = {
@@ -140,36 +155,36 @@ export const THEME_STYLES: Record<AppTheme, ThemeColors> = {
   },
   light: {
     id: 'light',
-    appBg: 'bg-[#f8fafc]',
-    sidebarBg: 'bg-[#f1f5f9]',
-    sidebarHeaderBg: 'bg-[#e2e8f0]',
+    appBg: 'bg-[#f6f8fa]',
+    sidebarBg: 'bg-[#f0f2f5]',
+    sidebarHeaderBg: 'bg-[#e4e7eb]',
     mainBg: 'bg-[#ffffff]',
     headerBg: 'bg-[#f8fafc]',
-    filterBarBg: 'bg-[#f1f5f9]',
-    cardBg: 'bg-white/70 hover:bg-white border-transparent',
-    cardActiveBg: 'bg-white border-slate-300 shadow-sm',
-    cardBorder: 'border-transparent',
-    cardBorderActive: 'border-slate-300',
+    filterBarBg: 'bg-[#f1f3f6]',
+    cardBg: 'bg-white hover:bg-slate-50/80 border-slate-200/80',
+    cardActiveBg: 'bg-white border-indigo-500 shadow-sm ring-1 ring-indigo-500/30',
+    cardBorder: 'border-slate-200/80',
+    cardBorderActive: 'border-indigo-500',
     textPrimary: 'text-slate-900',
     textSecondary: 'text-slate-700',
     textMuted: 'text-slate-400',
     inputBg: 'bg-white',
-    inputBorder: 'border-slate-300 focus:border-slate-400',
-    userBubbleBg: 'bg-white border-slate-200 shadow-sm',
-    assistantBubbleBg: 'bg-slate-50 border-slate-200',
-    border: 'border-slate-200',
-    accentText: 'text-blue-600',
-    accentBg: 'bg-blue-600 hover:bg-blue-500',
-    accentBorder: 'border-blue-500/30',
-    tagBg: 'bg-slate-200',
+    inputBorder: 'border-slate-300 focus:border-indigo-500',
+    userBubbleBg: 'bg-white border-slate-200/90 shadow-2xs',
+    assistantBubbleBg: 'bg-[#f8fafc] border-slate-200/80',
+    border: 'border-slate-200/90',
+    accentText: 'text-indigo-600',
+    accentBg: 'bg-indigo-600 hover:bg-indigo-500',
+    accentBorder: 'border-indigo-500/40',
+    tagBg: 'bg-slate-200/80',
     tagText: 'text-slate-700',
-    borderHover: 'hover:border-slate-400',
-    cardNormal: 'bg-white hover:bg-slate-50 border-slate-200',
-    cardActive: 'bg-white border-blue-500 shadow-md ring-1 ring-blue-500/20',
-    buttonGhost: 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
-    buttonSecondary: 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300',
-    badgeActive: 'bg-blue-600 text-white shadow-sm',
-    badgeInactive: 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900',
-    bgSidebar: 'bg-[#f1f5f9]'
+    borderHover: 'hover:border-slate-300',
+    cardNormal: 'bg-white hover:bg-slate-50 border-slate-200/90 shadow-2xs',
+    cardActive: 'bg-white border-indigo-500/80 shadow-xs ring-1 ring-indigo-500/20',
+    buttonGhost: 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60',
+    buttonSecondary: 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200',
+    badgeActive: 'bg-indigo-600 text-white shadow-xs',
+    badgeInactive: 'bg-slate-200/70 text-slate-600 hover:bg-slate-200 hover:text-slate-900',
+    bgSidebar: 'bg-[#f0f2f5]'
   }
 }
