@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -23,6 +23,73 @@ import path from 'path'
 
 // Set process name early so macOS Activity Monitor & Dock show AgentSwitch
 app.setName('AgentSwitch')
+
+function setupAppMenu(): void {
+  const isMac = process.platform === 'darwin'
+  const template: Electron.MenuItemConstructorOptions[] = [
+    ...(isMac
+      ? [
+          {
+            label: 'AgentSwitch',
+            submenu: [
+              { role: 'about' as const, label: '关于 AgentSwitch' },
+              { type: 'separator' as const },
+              { role: 'services' as const, label: '服务' },
+              { type: 'separator' as const },
+              { role: 'hide' as const, label: '隐藏 AgentSwitch' },
+              { role: 'hideOthers' as const, label: '隐藏其他应用' },
+              { role: 'unhide' as const, label: '全部显示' },
+              { type: 'separator' as const },
+              { role: 'quit' as const, label: '退出 AgentSwitch' }
+            ]
+          }
+        ]
+      : []),
+    {
+      label: '编辑',
+      submenu: [
+        { role: 'undo', label: '撤销' },
+        { role: 'redo', label: '重做' },
+        { type: 'separator' },
+        { role: 'cut', label: '剪切' },
+        { role: 'copy', label: '复制' },
+        { role: 'paste', label: '粘贴' },
+        { role: 'selectAll', label: '全选' }
+      ]
+    },
+    {
+      label: '视图',
+      submenu: [
+        { role: 'reload', label: '重新加载' },
+        { role: 'forceReload', label: '强制刷新' },
+        { role: 'toggleDevTools', label: '开发者工具' },
+        { type: 'separator' },
+        { role: 'resetZoom', label: '默认缩放' },
+        { role: 'zoomIn', label: '放大' },
+        { role: 'zoomOut', label: '缩小' },
+        { type: 'separator' },
+        { role: 'togglefullscreen', label: '切换全屏' }
+      ]
+    },
+    {
+      label: '窗口',
+      submenu: [
+        { role: 'minimize', label: '最小化' },
+        { role: 'zoom', label: '缩放' },
+        ...(isMac
+          ? [
+              { type: 'separator' as const },
+              { role: 'front' as const, label: '前置全部窗口' },
+              { type: 'separator' as const },
+              { role: 'window' as const, label: '窗口' }
+            ]
+          : [{ role: 'close' as const, label: '关闭窗口' }])
+      ]
+    }
+  ]
+  const menu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(menu)
+}
 
 let mainWindow: BrowserWindow | null = null
 
@@ -83,6 +150,7 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.agentswitch.desktop')
+  setupAppMenu()
   
   if (process.platform === 'darwin' && app.dock) {
     try {

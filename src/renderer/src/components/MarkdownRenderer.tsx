@@ -58,7 +58,7 @@ export function MarkdownRenderer({ content, onOpenFullscreen, maxCollapseLines =
               key={bIdx} 
               rawBlock={block} 
               maxCollapseLines={maxCollapseLines}
-              onOpenFullscreen={onOpenFullscreen}
+              onOpenFullscreen={onOpenFullscreen || onFullScreenCode}
             />
           )
         }

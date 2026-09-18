@@ -7,6 +7,7 @@ import clsx from 'clsx'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { AppTheme, THEME_STYLES } from '../theme'
 import { ConversationTurn } from './TurnOutline'
+import { sanitizePrompt } from '../utils/promptSanitizer'
 
 interface TurnCardProps {
   turn: ConversationTurn
@@ -32,13 +33,15 @@ export const TurnCard: React.FC<TurnCardProps> = ({
   const modifiedFiles = turn?.modifiedFiles || []
   const subagents = turn?.subagents || []
 
+  const sanitized = sanitizePrompt(turn?.userText || '')
   const [toolsExpanded, setToolsExpanded] = useState(false)
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
+  const [showMetadata, setShowMetadata] = useState(false)
   const [copiedPrompt, setCopiedPrompt] = useState(false)
   const [copiedResponse, setCopiedResponse] = useState(false)
 
   const handleCopyPrompt = () => {
-    navigator.clipboard.writeText(turn.userText)
+    navigator.clipboard.writeText(sanitized.cleanText || turn.userText)
     setCopiedPrompt(true)
     setTimeout(() => setCopiedPrompt(false), 1800)
   }
@@ -117,16 +120,65 @@ export const TurnCard: React.FC<TurnCardProps> = ({
               <span className={clsx("text-xs font-semibold tracking-wide", t.textPrimary)}>
                 用户指令 (User Prompt)
               </span>
+              {sanitized.hasEnvelopes && (
+                <button
+                  onClick={() => setShowMetadata(!showMetadata)}
+                  className={clsx(
+                    "text-[10px] px-2 py-0.5 rounded-full border transition-colors flex items-center gap-1 font-mono",
+                    t.tagBg, t.tagText, t.border, "hover:opacity-80"
+                  )}
+                  title="点击展开/收起包装的系统环境上下文"
+                >
+                  <span>{showMetadata ? '收起环境元数据' : '查看环境元数据'}</span>
+                  <ChevronDown className={clsx("w-3 h-3 transition-transform", showMetadata && "rotate-180")} />
+                </button>
+              )}
             </div>
             <div className={clsx("text-sm leading-relaxed", t.textPrimary)}>
               <MarkdownRenderer 
-                content={turn.userText} 
+                content={sanitized.cleanText || '(空用户指令)'} 
                 theme={theme}
                 onOpenInFolder={onOpenInFolder}
                 onFullScreenCode={onFullScreenCode}
                 onImageClick={onImageClick}
               />
             </div>
+
+            {/* Collapsible System Envelopes & Context Metadata */}
+            {showMetadata && (sanitized.contextSummary || sanitized.metadata || sanitized.systemMessage) && (
+              <div className="mt-3 p-3 rounded-xl bg-zinc-950/70 border border-zinc-800 text-xs space-y-2.5 font-sans">
+                {sanitized.contextSummary && (
+                  <div>
+                    <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <span>📜 会话上下文摘要 (Context Summary)</span>
+                    </div>
+                    <div className="text-zinc-300 text-xs leading-relaxed bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800/80 whitespace-pre-wrap">
+                      {sanitized.contextSummary}
+                    </div>
+                  </div>
+                )}
+                {sanitized.metadata && (
+                  <div>
+                    <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <span>⚙️ 运行时上下文与元数据 (Runtime Metadata)</span>
+                    </div>
+                    <pre className="text-zinc-400 font-mono text-[11px] leading-relaxed bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800/80 whitespace-pre-wrap overflow-x-auto">
+                      {sanitized.metadata}
+                    </pre>
+                  </div>
+                )}
+                {sanitized.systemMessage && (
+                  <div>
+                    <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <span>🤖 附带系统消息 (System Message)</span>
+                    </div>
+                    <pre className="text-zinc-400 font-mono text-[11px] leading-relaxed bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800/80 whitespace-pre-wrap overflow-x-auto">
+                      {sanitized.systemMessage}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

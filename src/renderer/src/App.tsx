@@ -18,6 +18,7 @@ import { FullScreenCodeModal } from './components/FullScreenCodeModal'
 import { TurnOutline, ConversationTurn } from './components/TurnOutline'
 import { TurnCard } from './components/TurnCard'
 import { THEME_STYLES, AppTheme } from './theme'
+import { sanitizePrompt } from './utils/promptSanitizer'
 
 interface ZSession {
   id: string
@@ -147,7 +148,7 @@ function App() {
   const [selectedAgentFilter, setSelectedAgentFilter] = useState<string>('all')
   const [selectedSessionSource, setSelectedSessionSource] = useState<string>('zcode')
   const [currentTurnIndex, setCurrentTurnIndex] = useState<number>(1)
-  const [viewMode, setViewMode] = useState<'stream' | 'card'>('stream')
+  const [viewMode, setViewMode] = useState<'stream' | 'card'>('card')
   const [showOutline, setShowOutline] = useState<boolean>(true)
 
   // Transcript Data
@@ -600,25 +601,94 @@ function App() {
             </button>
           </div>
 
-          {/* Local Ecosystem Radar Card */}
-          <div className={clsx("mb-2.5 rounded-xl border p-2.5 transition-all", t.cardBg, t.border)}>
-            <div className="flex items-center justify-between mb-2">
-              <div 
+          {/* Unified High-Density Ecosystem Switcher (CC-Switch Style, Zero Horizontal Overflow) */}
+          <div className="grid grid-cols-3 gap-1 mb-2.5">
+            {[
+              { 
+                id: 'all', 
+                label: '全部', 
+                color: '#6366f1', 
+                count: ecosystems.reduce((sum, e) => sum + (e.sessionCount || 0), 0) || allSessions.length 
+              },
+              { 
+                id: 'zcode', 
+                label: 'ZCode', 
+                color: '#6366f1', 
+                count: ecosystems.find(e => e.id === 'zcode')?.sessionCount ?? 0 
+              },
+              { 
+                id: 'antigravity', 
+                label: '反重力', 
+                color: '#a855f7', 
+                count: ecosystems.find(e => e.id === 'antigravity')?.sessionCount ?? 0 
+              },
+              { 
+                id: 'claude', 
+                label: 'Claude', 
+                color: '#f59e0b', 
+                count: ecosystems.find(e => e.id === 'claude')?.sessionCount ?? 0 
+              },
+              { 
+                id: 'codex', 
+                label: 'Codex', 
+                color: '#10b981', 
+                count: ecosystems.find(e => e.id === 'codex')?.sessionCount ?? 0 
+              },
+              { 
+                id: 'opencode', 
+                label: 'OpenCode', 
+                color: '#38bdf8', 
+                count: ecosystems.find(e => e.id === 'opencode')?.sessionCount ?? 0 
+              }
+            ].map(tab => {
+              const isActive = selectedAgentFilter === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setSelectedAgentFilter(tab.id)
+                    loadSessions(tab.id)
+                  }}
+                  className={clsx(
+                    "flex items-center justify-between px-1.5 py-1 rounded-md text-[10.5px] font-medium transition-all border text-left",
+                    isActive
+                      ? "bg-indigo-600/25 text-indigo-200 border-indigo-500/90 shadow-xs ring-1 ring-indigo-500/40 font-semibold"
+                      : clsx(t.cardBg, t.border, t.textSecondary, "hover:bg-white/5 hover:border-zinc-700")
+                  )}
+                >
+                  <div className="flex items-center space-x-1 truncate min-w-0">
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tab.color }} />
+                    <span className="truncate">{tab.label}</span>
+                  </div>
+                  <span className={clsx(
+                    "text-[9px] font-mono px-1 rounded ml-0.5 shrink-0",
+                    isActive ? "bg-indigo-500/30 text-indigo-200 font-bold" : clsx(t.tagBg, t.textMuted)
+                  )}>
+                    {tab.count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Compact Radar & Quick Action Strip */}
+          <div className={clsx("mb-2 rounded-lg border px-2.5 py-1.5 transition-all", t.cardBg, t.border)}>
+            <div className="flex items-center justify-between">
+              <button 
                 onClick={() => setShowEcosystemRadar(!showEcosystemRadar)}
-                className="flex items-center space-x-1.5 cursor-pointer hover:opacity-80 transition-opacity"
+                className="flex items-center space-x-1.5 hover:opacity-80 transition-opacity text-[11px]"
               >
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span className={clsx("text-[11px] font-semibold tracking-tight", t.textPrimary)}>
-                  本地 Agent 生态雷达
+                <span className={clsx("font-semibold", t.textPrimary)}>
+                  本地雷达 ({ecosystems.filter(e => e.status === 'active').length} 在线)
                 </span>
-                <span className={clsx("text-[10px] font-mono", t.textMuted)}>
-                  ({ecosystems.filter(e => e.status === 'active').length} 在线)
-                </span>
-              </div>
-              <div className="flex items-center space-x-1">
+                <ChevronDown className={clsx("w-3 h-3 transition-transform text-zinc-400", showEcosystemRadar && "rotate-180")} />
+              </button>
+
+              <div className="flex items-center space-x-1.5">
                 <button
                   onClick={handleImportSession}
                   className={clsx("px-2 py-0.5 rounded text-[10px] font-medium border flex items-center space-x-1 transition-colors", t.tagBg, t.tagText, t.border)}
@@ -627,85 +697,26 @@ function App() {
                   <UploadCloud className="w-3 h-3" />
                   <span>导入</span>
                 </button>
-                <button
-                  onClick={() => setShowEcosystemRadar(!showEcosystemRadar)}
-                  className={clsx("p-1 rounded text-[10px]", t.textMuted)}
-                >
-                  {showEcosystemRadar ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                </button>
+                {dbStats && (
+                  <button 
+                    onClick={handleBatchExport}
+                    className={clsx("px-2 py-0.5 rounded text-[10px] font-medium border flex items-center space-x-1 transition-colors", t.accentBg, "text-white border-transparent")}
+                    title="一键将所有会话批量导出至指定目录"
+                  >
+                    <FolderArchive className="w-3 h-3" />
+                    <span>导出</span>
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Scanned CLIs Mini-Pills */}
-            <div className="flex items-center space-x-1.5 overflow-x-auto custom-scrollbar pb-0.5">
-              {ecosystems.map(eco => (
-                <button
-                  key={eco.id}
-                  onClick={() => {
-                    setSelectedAgentFilter(eco.id)
-                    loadSessions(eco.id)
-                  }}
-                  title={`点击切至 ${eco.name} 会话 (${eco.sessionCount} 会话)`}
-                  className={clsx(
-                    "flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] shrink-0 border transition-all cursor-pointer hover:opacity-100",
-                    selectedAgentFilter === eco.id
-                      ? "bg-indigo-600/30 text-indigo-300 border-indigo-500 font-semibold ring-1 ring-indigo-500/40"
-                      : eco.status === 'active' 
-                        ? clsx(t.cardActiveBg, t.cardBorderActive, t.textPrimary)
-                        : clsx(t.cardBg, t.cardBorder, t.textMuted, "opacity-60")
-                  )}
-                >
-                  <span 
-                    className="w-1.5 h-1.5 rounded-full shrink-0" 
-                    style={{ backgroundColor: eco.status === 'active' ? eco.color : '#71717a' }} 
-                  />
-                  <span className="font-mono">{eco.cliName}</span>
-                  {eco.sessionCount > 0 && (
-                    <span className="font-mono text-[9px] opacity-75">({eco.sessionCount})</span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {/* Agent Ecosystem Switcher Bar */}
-            <div className={clsx("mt-2.5 pt-2 border-t flex items-center gap-1 overflow-x-auto custom-scrollbar pb-1", t.border)}>
-              {[
-                { id: 'all', label: '全部生态', color: '#6366f1' },
-                { id: 'zcode', label: 'ZCode', color: '#6366f1' },
-                { id: 'antigravity', label: '反重力', color: '#a855f7' },
-                { id: 'claude', label: 'Claude', color: '#f59e0b' },
-                { id: 'codex', label: 'Codex', color: '#10b981' },
-                { id: 'opencode', label: 'OpenCode', color: '#38bdf8' }
-              ].map(tab => {
-                const isActive = selectedAgentFilter === tab.id
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      setSelectedAgentFilter(tab.id)
-                      loadSessions(tab.id)
-                    }}
-                    className={clsx(
-                      "px-2 py-1 rounded-md text-[10px] font-medium transition-all shrink-0 flex items-center space-x-1 border",
-                      isActive 
-                        ? "bg-indigo-600 text-white border-indigo-500 font-semibold shadow-xs" 
-                        : clsx(t.tagBg, t.tagText, t.border, "hover:opacity-80")
-                    )}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tab.color }} />
-                    <span>{tab.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Expanded Radar Detail Card */}
+            {/* Collapsible Radar Detail Card */}
             {showEcosystemRadar && (
-              <div className={clsx("mt-2.5 pt-2 border-t space-y-1.5", t.border)}>
+              <div className={clsx("mt-2 pt-2 border-t space-y-1.5", t.border)}>
                 {ecosystems.map(eco => (
                   <div key={eco.id} className="flex items-center justify-between text-[11px]">
                     <div className="flex items-center space-x-1.5 truncate">
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: eco.color }} />
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: eco.color }} />
                       <span className={clsx("font-medium", eco.status === 'active' ? t.textPrimary : t.textMuted)}>
                         {eco.name}
                       </span>
@@ -722,28 +733,17 @@ function App() {
             )}
           </div>
 
-          {/* Database Health Status Bar */}
+          {/* Micro DB Health Bar */}
           {dbStats && (
-            <div className={clsx(
-              "flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-[10px] mb-2.5",
-              t.cardBg, t.border
-            )}>
+            <div className={clsx("flex items-center justify-between px-1 text-[10px] mb-2 font-mono", t.textMuted)}>
               <div className="flex items-center space-x-1.5 truncate">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                <span className={clsx("font-mono font-medium", t.textPrimary)}>{dbStats.dbSize}</span>
-                <span className={t.textMuted}>•</span>
-                <span className={t.textMuted}>{dbStats.totalSessions} 会话</span>
-                <span className={t.textMuted}>•</span>
-                <span className={t.textMuted}>{dbStats.totalMessages} 消息</span>
+                <span className={t.textPrimary}>{dbStats.dbSize}</span>
+                <span>•</span>
+                <span>{dbStats.totalSessions} 会话</span>
+                <span>•</span>
+                <span>{dbStats.totalMessages} 消息</span>
               </div>
-              <button 
-                onClick={handleBatchExport}
-                className={clsx("font-medium shrink-0 flex items-center space-x-1 ml-2 transition-colors", t.accentText)}
-                title="一键将所有会话批量导出至指定目录"
-              >
-                <FolderArchive className="w-3 h-3" />
-                <span>全量导出</span>
-              </button>
             </div>
           )}
 
@@ -915,7 +915,17 @@ function App() {
                           </h4>
                         </div>
 
-                        <div className={clsx("flex items-center space-x-2 text-[10px] mt-1", t.textMuted)}>
+                        <div className={clsx("flex items-center space-x-1.5 text-[10px] mt-1 flex-wrap", t.textMuted)}>
+                          <span 
+                            className="text-[9px] font-medium px-1.5 py-0.2 rounded font-mono shrink-0 border"
+                            style={{ 
+                              borderColor: `${(s as any).sourceColor || '#6366f1'}40`, 
+                              color: (s as any).sourceColor || '#818cf8', 
+                              backgroundColor: `${(s as any).sourceColor || '#6366f1'}18` 
+                            }}
+                          >
+                            {(s as any).sourceName || ((s as any).source ? (s as any).source.toUpperCase() : 'ZCode')}
+                          </span>
                           <span>{formatRelativeTime(s.time_created)}</span>
                           <span>•</span>
                           <span className="font-mono">
@@ -973,7 +983,10 @@ function App() {
                       {s.children.map(child => (
                         <div
                           key={child.id}
-                          onClick={() => setSelectedSessionId(child.id)}
+                          onClick={() => {
+                            setSelectedSessionId(child.id)
+                            setSelectedSessionSource((child as any).source || 'zcode')
+                          }}
                           className={clsx(
                             "p-2 rounded-lg text-left cursor-pointer transition-all border text-[11px]",
                             selectedSessionId === child.id
@@ -1425,10 +1438,55 @@ function App() {
 
                           {/* Message Body Content (Rich Markdown with Code Expansion, Lightbox, File Chips) */}
                           {content ? (
-                            <MarkdownRenderer 
-                              content={content}
-                              onOpenFullscreen={(code, lang) => setFullscreenModal({ open: true, code, lang })}
-                            />
+                            (() => {
+                              if (isUser) {
+                                const sanitized = sanitizePrompt(content)
+                                return (
+                                  <div className="space-y-2">
+                                    <MarkdownRenderer 
+                                      content={sanitized.cleanText || '(空用户指令)'}
+                                      onOpenFullscreen={(code, lang) => setFullscreenModal({ open: true, code, lang })}
+                                    />
+                                    {sanitized.hasEnvelopes && (
+                                      <div className="pt-1">
+                                        <details className="text-[11px] font-mono text-zinc-400 bg-black/20 rounded-lg p-2 border border-white/5">
+                                          <summary className="cursor-pointer text-[10px] text-zinc-400 hover:text-zinc-200 font-sans font-medium select-none flex items-center gap-1">
+                                            <span>⚙️ 附带上下文元数据与环境包装</span>
+                                            <span className="text-zinc-500 font-mono text-[9px]">(已自动提纯核心指令)</span>
+                                          </summary>
+                                          <div className="mt-2 space-y-2 border-t border-white/5 pt-2">
+                                            {sanitized.contextSummary && (
+                                              <div>
+                                                <div className="text-[9px] text-indigo-400 font-sans font-semibold mb-0.5">上下文摘要：</div>
+                                                <div className="whitespace-pre-wrap text-[10px] text-zinc-300 font-sans bg-black/30 p-2 rounded border border-white/5">{sanitized.contextSummary}</div>
+                                              </div>
+                                            )}
+                                            {sanitized.metadata && (
+                                              <div>
+                                                <div className="text-[9px] text-amber-400 font-sans font-semibold mb-0.5">运行时元数据：</div>
+                                                <pre className="whitespace-pre-wrap text-[10px] text-zinc-400 bg-black/30 p-2 rounded border border-white/5 overflow-x-auto">{sanitized.metadata}</pre>
+                                              </div>
+                                            )}
+                                            {sanitized.systemMessage && (
+                                              <div>
+                                                <div className="text-[9px] text-emerald-400 font-sans font-semibold mb-0.5">系统消息：</div>
+                                                <pre className="whitespace-pre-wrap text-[10px] text-zinc-400 bg-black/30 p-2 rounded border border-white/5 overflow-x-auto">{sanitized.systemMessage}</pre>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </details>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              }
+                              return (
+                                <MarkdownRenderer 
+                                  content={content}
+                                  onOpenFullscreen={(code, lang) => setFullscreenModal({ open: true, code, lang })}
+                                />
+                              )
+                            })()
                           ) : (
                             !hasTools && !thought && (
                               <div className={clsx("italic", t.textMuted)}>（该消息无文本内容）</div>
