@@ -581,8 +581,11 @@ function App() {
     <div className={clsx("flex h-screen font-sans select-none overflow-hidden antialiased", t.appBg, t.textSecondary)} style={{ fontSize: `${fontSize}px` }}>
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="absolute top-5 right-8 z-50 flex items-center space-x-2 bg-zinc-800/95 text-zinc-100 px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-xl border border-zinc-700/60 text-xs font-medium animate-in fade-in slide-in-from-top-3">
-          <Sparkles className="w-4 h-4 text-indigo-400" />
+        <div className={clsx(
+          "absolute top-5 right-8 z-50 flex items-center space-x-2 px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-xl border text-xs font-medium animate-in fade-in slide-in-from-top-3",
+          t.isDark ? "bg-zinc-800/95 text-zinc-100 border-zinc-700/60" : "bg-white/95 text-slate-900 border-slate-200 shadow-xl"
+        )}>
+          <Sparkles className="w-4 h-4 text-indigo-500" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -600,6 +603,7 @@ function App() {
         dbPath={dbStats?.dbPath}
         onSelectCustomDb={handleSelectCustomDb}
         onRefreshDb={loadSessions}
+        theme={effectiveTheme}
       />
 
       {/* Universal File & Code & Image Preview Modal */}
@@ -620,20 +624,20 @@ function App() {
 
       {/* Preview Modal */}
       {previewModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in">
-          <div className="bg-[#121215] border border-zinc-800 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-[#18181b]">
+        <div className={clsx("fixed inset-0 z-50 flex items-center justify-center p-6 animate-in fade-in", t.modalBackdropBg || "bg-black/80 backdrop-blur-sm")}>
+          <div className={clsx("border rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden", t.modalBg)}>
+            <div className={clsx("px-6 py-4 border-b flex items-center justify-between", t.modalHeaderBg)}>
               <div className="flex items-center space-x-3">
-                <FileText className="w-5 h-5 text-indigo-400" />
+                <FileText className="w-5 h-5 text-indigo-500" />
                 <div>
-                  <h3 className="text-sm font-semibold text-zinc-100">{previewModal.title}</h3>
-                  <p className="text-[11px] text-zinc-400 font-mono mt-0.5">{previewModal.filename} • {previewModal.messageCount} {locale === 'en-US' ? 'messages' : '条消息'}</p>
+                  <h3 className={clsx("text-sm font-semibold", t.textPrimary)}>{previewModal.title}</h3>
+                  <p className={clsx("text-[11px] font-mono mt-0.5", t.textMuted)}>{previewModal.filename} • {previewModal.messageCount} {locale === 'en-US' ? 'messages' : '条消息'}</p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => copyText(previewModal.content, 'preview-modal')}
-                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5 border border-zinc-700"
+                  className={clsx("px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5 border", t.buttonSecondary)}
                 >
                   <Copy className="w-3.5 h-3.5" />
                   <span>{locale === 'en-US' ? 'Copy All' : '复制全文'}</span>
@@ -647,16 +651,16 @@ function App() {
                 </button>
                 <button
                   onClick={() => setPreviewModal(null)}
-                  className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors ml-2"
+                  className={clsx("p-1.5 rounded-lg transition-colors ml-2", t.buttonGhost)}
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto p-6 bg-[#09090b] font-mono text-xs text-zinc-300 custom-scrollbar select-text">
+            <div className={clsx("flex-1 overflow-auto p-6 font-mono text-xs custom-scrollbar select-text", t.codeBlockBg)}>
               <pre className="whitespace-pre-wrap leading-relaxed">{previewModal.content.slice(0, 100000)}</pre>
               {previewModal.content.length > 100000 && (
-                <div className="p-3 text-center text-zinc-500 text-xs italic border-t border-zinc-800 mt-4">
+                <div className={clsx("p-3 text-center text-xs italic border-t mt-4", t.border, t.textMuted)}>
                   {locale === 'en-US' ? '(Showing first 100,000 characters, full data saved on export)' : '（预览展示前 100,000 字符，保存时写入完整数据）'}
                 </div>
               )}
@@ -667,48 +671,65 @@ function App() {
 
       {/* Pane 1: Left Sidebar (Sessions Explorer & Ecosystem Radar) */}
       <div className={clsx(
-        "w-[340px] border-r flex flex-col shrink-0 relative transition-colors",
+        "w-[320px] xl:w-[340px] border-r flex flex-col shrink-0 relative transition-colors",
         t.sidebarBg, t.border
       )}>
         {/* macOS Traffic Lights Safe Zone & Brand Header */}
         <div className={clsx(
-          "pt-9 pb-3 px-4 border-b transition-colors",
+          "pt-3 pb-3 px-3.5 border-b transition-colors select-none",
           t.sidebarHeaderBg, t.border
         )}>
-          <div className="flex items-center space-x-3 mb-3 pl-16">
-            <Logo className="w-8 h-8 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2">
-                <h1 className={clsx("font-bold text-sm tracking-tight", t.textPrimary)}>
-                  AgentSwitch
-                </h1>
-                <span className={clsx(
-                  "text-[10px] font-semibold px-1.5 py-0.5 rounded border",
-                  t.tagBg, t.tagText, t.border
-                )}>
-                  v2.6
-                </span>
-              </div>
-              <p className={clsx("text-[11px] truncate mt-0.5", t.textMuted)}>{tr('brand.tagline')}</p>
-            </div>
-            
-            {/* Action Buttons: Language Switch & Settings */}
-            <div className="flex items-center space-x-1 shrink-0">
+          {/* Row 1: macOS Window Bar (Traffic lights spacer + System Action Controls) */}
+          <div className="h-7 flex items-center justify-between mb-2">
+            {/* macOS traffic light spacer (allows window dragging) */}
+            <div className="w-16 h-full shrink-0 [app-region:drag]" />
+
+            {/* Right: Titlebar Quick Actions (Language Switcher & Settings) */}
+            <div className="flex items-center space-x-1.5 shrink-0 [app-region:no-drag]">
               <button
                 onClick={() => setLocale(locale === 'zh-CN' ? 'en-US' : 'zh-CN')}
-                title={locale === 'zh-CN' ? 'Switch to English' : '切换至简体中文'}
-                className={clsx("px-2 py-1 rounded-lg text-[10px] font-mono font-medium transition-colors border flex items-center gap-1", t.tagBg, t.border, t.textSecondary, "hover:text-white")}
+                title={locale === 'zh-CN' ? 'Switch to English (切换至英文)' : '切换至简体中文 (Switch to Chinese)'}
+                className={clsx(
+                  "h-6.5 px-2 rounded-md text-[10.5px] font-mono font-medium transition-all border flex items-center gap-1 shadow-2xs active:scale-95",
+                  t.cardBg, t.border, t.textSecondary,
+                  t.isDark ? "hover:text-zinc-100 hover:border-zinc-700" : "hover:text-slate-900 hover:border-slate-300"
+                )}
               >
-                <Languages className="w-3 h-3 text-indigo-400" />
+                <Languages className="w-3 h-3 text-indigo-400 shrink-0" />
                 <span>{locale === 'zh-CN' ? 'EN' : '中'}</span>
               </button>
               <button 
                 onClick={() => setSettingsOpen(true)}
                 title={tr('settings.title')}
-                className={clsx("p-1.5 rounded-lg transition-colors hover:bg-black/10 dark:hover:bg-white/10", t.textMuted)}
+                className={clsx(
+                  "h-6.5 w-6.5 rounded-md border flex items-center justify-center transition-all shadow-2xs active:scale-95",
+                  t.cardBg, t.border, t.textSecondary,
+                  t.isDark ? "hover:text-zinc-100 hover:border-zinc-700" : "hover:text-slate-900 hover:border-slate-300"
+                )}
               >
                 <Settings className="w-3.5 h-3.5" />
               </button>
+            </div>
+          </div>
+
+          {/* Row 2: Brand Identity Header */}
+          <div className="flex items-center space-x-2.5 mb-3 px-0.5">
+            <Logo className="w-7 h-7 shrink-0 rounded-lg shadow-xs" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 leading-none">
+                <h1 className={clsx("font-bold text-sm tracking-tight truncate", t.textPrimary)}>
+                  AgentSwitch
+                </h1>
+                <span className={clsx(
+                  "inline-flex items-center text-[9.5px] font-mono font-semibold px-1.5 py-0.5 rounded border leading-none shrink-0",
+                  t.tagBg, t.tagText, t.border
+                )}>
+                  v2.6
+                </span>
+              </div>
+              <p className={clsx("text-[11px] truncate mt-1 leading-tight", t.textMuted)} title={tr('brand.tagline')}>
+                {tr('brand.tagline')}
+              </p>
             </div>
           </div>
 
@@ -760,11 +781,14 @@ function App() {
                     setSelectedAgentFilter(tab.id)
                     loadSessions(tab.id)
                   }}
+                  title={tab.label}
                   className={clsx(
-                    "flex items-center justify-between px-1.5 py-1 rounded-md text-[10.5px] font-medium transition-all border text-left",
+                    "flex items-center justify-between px-1.5 py-1 rounded-md text-[10px] font-medium transition-all border text-left",
                     isActive
-                      ? "bg-indigo-600/25 text-indigo-200 border-indigo-500/90 shadow-xs ring-1 ring-indigo-500/40 font-semibold"
-                      : clsx(t.cardBg, t.border, t.textSecondary, "hover:bg-white/5 hover:border-zinc-700")
+                      ? (t.isDark
+                          ? "bg-indigo-600/30 text-indigo-100 border-indigo-500/90 shadow-xs ring-1 ring-indigo-500/40 font-semibold"
+                          : "bg-indigo-100/95 text-indigo-950 border-indigo-500/70 shadow-xs ring-1 ring-indigo-500/30 font-bold")
+                      : clsx(t.cardBg, t.border, t.textSecondary, t.isDark ? "hover:bg-white/5 hover:border-zinc-700" : "hover:bg-slate-100 hover:border-slate-300")
                   )}
                 >
                   <div className="flex items-center space-x-1 truncate min-w-0">
@@ -773,7 +797,9 @@ function App() {
                   </div>
                   <span className={clsx(
                     "text-[9px] font-mono px-1 rounded ml-0.5 shrink-0",
-                    isActive ? "bg-indigo-500/30 text-indigo-200 font-bold" : clsx(t.tagBg, t.textMuted)
+                    isActive 
+                      ? (t.isDark ? "bg-indigo-500/30 text-indigo-200 font-bold" : "bg-indigo-200/90 text-indigo-950 font-bold") 
+                      : clsx(t.tagBg, t.textMuted)
                   )}>
                     {tab.count}
                   </span>
@@ -933,35 +959,38 @@ function App() {
             <button
               onClick={() => setFilterMode('roots')}
               className={clsx(
-                "py-1 rounded font-medium transition-all text-center",
+                "py-1 px-1 rounded font-medium transition-all text-center truncate",
                 filterMode === 'roots' 
-                  ? clsx(t.cardActiveBg, t.cardBorderActive, t.textPrimary, "shadow-sm") 
+                  ? clsx(t.cardActiveBg, t.cardBorderActive, t.textPrimary, "shadow-2xs") 
                   : clsx(t.textMuted, "hover:opacity-100")
               )}
+              title={locale === 'en-US' ? `Main Sessions (${rootSessions.length})` : `主任务 (${rootSessions.length})`}
             >
-              {tr('search.mainTasks')} ({rootSessions.length})
+              <span className="truncate">{tr('search.mainTasks')} ({rootSessions.length})</span>
             </button>
             <button
               onClick={() => setFilterMode('with_subagents')}
               className={clsx(
-                "py-1 rounded font-medium transition-all text-center",
+                "py-1 px-1 rounded font-medium transition-all text-center truncate",
                 filterMode === 'with_subagents' 
-                  ? clsx(t.cardActiveBg, t.cardBorderActive, t.textPrimary, "shadow-sm") 
+                  ? clsx(t.cardActiveBg, t.cardBorderActive, t.textPrimary, "shadow-2xs") 
                   : clsx(t.textMuted, "hover:opacity-100")
               )}
+              title={locale === 'en-US' ? 'With Subagent Tasks' : '含子任务'}
             >
-              {tr('search.subTasks')}
+              <span className="truncate">{tr('search.subTasks')}</span>
             </button>
             <button
               onClick={() => setFilterMode('all')}
               className={clsx(
-                "py-1 rounded font-medium transition-all text-center",
+                "py-1 px-1 rounded font-medium transition-all text-center truncate",
                 filterMode === 'all' 
-                  ? clsx(t.cardActiveBg, t.cardBorderActive, t.textPrimary, "shadow-sm") 
+                  ? clsx(t.cardActiveBg, t.cardBorderActive, t.textPrimary, "shadow-2xs") 
                   : clsx(t.textMuted, "hover:opacity-100")
               )}
+              title={locale === 'en-US' ? `All Sessions (${allSessions.length})` : `全量 (${allSessions.length})`}
             >
-              {tr('search.allSessions')} ({allSessions.length})
+              <span className="truncate">{tr('search.allSessions')} ({allSessions.length})</span>
             </button>
           </div>
         </div>
@@ -971,7 +1000,7 @@ function App() {
           {error && <div className="text-red-400 p-3 text-xs bg-red-950/40 rounded-lg border border-red-800/40">{error}</div>}
           
           {filteredSessions.length === 0 ? (
-            <div className="p-8 text-center text-zinc-600 text-xs">未找到匹配的会话</div>
+            <div className="p-8 text-center text-zinc-600 text-xs">{tr('search.noSessions')}</div>
           ) : (
             filteredSessions.map(s => {
               const isSelected = selectedSessionId === s.id
@@ -1020,7 +1049,7 @@ function App() {
                             <MessageSquare className={clsx("w-3.5 h-3.5 shrink-0", t.textMuted)} />
                           )}
                           <h4 className={clsx("truncate font-semibold text-xs", isSelected ? t.textPrimary : t.textSecondary)} title={s.title}>
-                            {s.title || '无标题会话'}
+                            {s.title || (locale === 'en-US' ? 'Untitled Session' : '无标题会话')}
                           </h4>
                         </div>
 
@@ -1038,7 +1067,9 @@ function App() {
                           <span>{formatRelativeTime(s.time_created)}</span>
                           <span>•</span>
                           <span className="font-mono">
-                            {s.total_messages !== undefined ? `${s.total_messages} 消息` : `${s.message_count} 消息`}
+                            {s.total_messages !== undefined 
+                              ? (locale === 'en-US' ? `${s.total_messages} msgs` : `${s.total_messages} 消息`)
+                              : (locale === 'en-US' ? `${s.message_count} msgs` : `${s.message_count} 消息`)}
                           </span>
                           {s.directory && (
                             <>
@@ -1056,7 +1087,7 @@ function App() {
                         <button
                           onClick={(e) => togglePin(s.id, e)}
                           className={clsx("p-1 rounded transition-colors", isPinned ? "text-amber-400" : clsx(t.textMuted, "opacity-0 group-hover:opacity-100"))}
-                          title={isPinned ? "取消置顶" : "置顶会话"}
+                          title={isPinned ? (locale === 'en-US' ? 'Unpin' : '取消置顶') : (locale === 'en-US' ? 'Pin' : '置顶会话')}
                         >
                           <Pin className="w-3 h-3" />
                         </button>
@@ -1065,7 +1096,7 @@ function App() {
                           <button
                             onClick={(e) => toggleParentExpand(s.id, e)}
                             className={clsx("p-1 rounded transition-colors", t.textMuted)}
-                            title="展开/折叠子任务"
+                            title={locale === 'en-US' ? 'Toggle Subtasks' : '展开/折叠子任务'}
                           >
                             {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                           </button>
@@ -1080,7 +1111,7 @@ function App() {
                           t.tagBg, t.tagText, t.border
                         )}>
                           <GitFork className={clsx("w-3 h-3", t.accentText)} />
-                          <span>聚合 {s.child_count || s.children?.length} 个子任务 Agent</span>
+                          <span>{locale === 'en-US' ? `Aggregated ${s.child_count || s.children?.length} Subagents` : `聚合 ${s.child_count || s.children?.length} 个子任务 Agent`}</span>
                         </span>
                       </div>
                     )}
@@ -1104,11 +1135,11 @@ function App() {
                           )}
                         >
                           <div className={clsx("truncate font-medium", selectedSessionId === child.id ? t.textPrimary : t.textSecondary)} title={child.title}>
-                            {child.title || '独立执行子任务'}
+                            {child.title || (locale === 'en-US' ? 'Subagent Task' : '独立执行子任务')}
                           </div>
                           <div className={clsx("text-[9px] mt-0.5 flex justify-between", t.textMuted)}>
                             <span>{new Date(child.time_created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                            <span className="font-mono">{child.message_count} 条</span>
+                            <span className="font-mono">{child.message_count} {locale === 'en-US' ? 'msgs' : '条'}</span>
                           </div>
                         </div>
                       ))}
@@ -1130,116 +1161,124 @@ function App() {
           <>
             {/* Top Session Header */}
             <div className={clsx(
-              "py-3.5 px-6 border-b flex flex-col justify-between shrink-0 transition-colors",
+              "py-3 px-4 sm:px-6 border-b flex flex-col justify-between shrink-0 transition-colors overflow-hidden",
               t.headerBg, t.border
             )}>
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex-1 min-w-0 pr-4">
+              <div className="flex items-center justify-between gap-3 mb-1.5 min-w-0">
+                <div className="flex-1 min-w-0">
                   <h2 className={clsx("text-base font-bold truncate", t.textPrimary)} title={currentSessionMeta?.title}>
-                    {currentSessionMeta?.title || '会话详情'}
+                    {currentSessionMeta?.title || (locale === 'en-US' ? 'Session Details' : '会话详情')}
                   </h2>
                 </div>
 
                 {/* Right Controls */}
-                <div className="flex items-center space-x-2.5 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0 flex-nowrap justify-end">
                   {transcriptData && transcriptData.descendantCount > 0 && (
                     <button
                       onClick={() => setIncludeChildren(!includeChildren)}
                       className={clsx(
-                        "px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center space-x-1.5 border",
+                        "h-7 px-2 sm:px-2.5 rounded-lg text-xs font-medium transition-all flex items-center space-x-1 border shrink-0",
                         includeChildren
-                          ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/40"
+                          ? (t.isDark ? "bg-indigo-600/25 text-indigo-200 border-indigo-500/50" : "bg-indigo-100 text-indigo-950 border-indigo-400 font-semibold shadow-xs")
                           : clsx(t.tagBg, t.tagText, t.border)
                       )}
-                      title="开启后将该任务与其派生的所有子 Agent 对话按时序完整合并"
+                      title={locale === 'en-US' ? 'Merge descendant subagent sessions into chronological timeline' : '开启后将该任务与其派生的所有子 Agent 对话按时序完整合并'}
                     >
-                      <Layers className="w-3.5 h-3.5" />
-                      <span>{includeChildren ? '已时序合并子任务' : '仅主任务'}</span>
+                      <Layers className="w-3.5 h-3.5 shrink-0" />
+                      {!showInspector && <span className="hidden xl:inline">{includeChildren ? (locale === 'en-US' ? 'Merged Subagents' : '已时序合并子任务') : (locale === 'en-US' ? 'Main Only' : '仅主任务')}</span>}
+                      {showInspector && <span className="text-[11px] font-mono">{transcriptData.descendantCount}</span>}
                     </button>
                   )}
 
-                  <div className="flex items-center p-0.5 rounded-lg border text-[11px]" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                  <div className={clsx("flex items-center p-0.5 rounded-lg border text-[11px] shrink-0", t.border, t.isDark ? "bg-zinc-900/60" : "bg-slate-100/80")}>
                     <button
                       onClick={() => setViewMode('stream')}
                       className={clsx(
-                        "px-2.5 py-1 rounded text-[11px] font-medium transition-all flex items-center space-x-1.5",
-                        viewMode === 'stream' ? "bg-zinc-800 border border-zinc-700 text-zinc-100 font-semibold shadow-xs" : clsx(t.textMuted, "hover:text-zinc-200")
+                        "h-6 px-2 rounded text-[11px] font-medium transition-all flex items-center space-x-1 shrink-0",
+                        viewMode === 'stream' ? t.pillActiveBg : t.pillInactiveBg
                       )}
-                      title="连续流式视图"
+                      title={locale === 'en-US' ? 'Continuous Stream View' : '连续流式视图'}
                     >
-                      <AlignLeft className="w-3.5 h-3.5" />
-                      <span>{tr('view.stream')}</span>
+                      <AlignLeft className="w-3.5 h-3.5 shrink-0" />
+                      {!showInspector && <span className="hidden lg:inline">{tr('view.stream')}</span>}
                     </button>
                     <button
                       onClick={() => setViewMode('card')}
                       className={clsx(
-                        "px-2.5 py-1 rounded text-[11px] font-medium transition-all flex items-center space-x-1.5",
-                        viewMode === 'card' ? "bg-zinc-800 border border-zinc-700 text-zinc-100 font-semibold shadow-xs" : clsx(t.textMuted, "hover:text-zinc-200")
+                        "h-6 px-2 rounded text-[11px] font-medium transition-all flex items-center space-x-1 shrink-0",
+                        viewMode === 'card' ? t.pillActiveBg : t.pillInactiveBg
                       )}
-                      title="轮次卡片视图 (⌥↑ / ⌥↓)"
+                      title={locale === 'en-US' ? 'Turn Card View (⌥↑ / ⌥↓)' : '轮次卡片视图 (⌥↑ / ⌥↓)'}
                     >
-                      <Layers className="w-3.5 h-3.5" />
-                      <span>{tr('view.card')}</span>
+                      <Layers className="w-3.5 h-3.5 shrink-0" />
+                      {!showInspector && <span className="hidden lg:inline">{tr('view.card')}</span>}
                     </button>
                   </div>
 
                   <button
                     onClick={() => setShowOutline(!showOutline)}
                     className={clsx(
-                      "px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center space-x-1.5 border",
-                      showOutline ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/40" : clsx(t.tagBg, t.tagText, t.border)
+                      "h-7 px-2 sm:px-2.5 rounded-lg text-xs font-medium transition-all flex items-center space-x-1 border shrink-0",
+                      showOutline 
+                        ? (t.isDark ? "bg-indigo-600/25 text-indigo-200 border-indigo-500/50" : "bg-indigo-100 text-indigo-950 border-indigo-400 font-semibold shadow-xs") 
+                        : clsx(t.tagBg, t.tagText, t.border)
                     )}
-                    title="展开/收起大纲 (⌘O)"
+                    title={locale === 'en-US' ? 'Toggle Turns Outline (⌘O)' : '展开/收起大纲 (⌘O)'}
                   >
-                    <Layers className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>{tr('view.outline', { count: (transcriptData as any)?.turns?.length || 0 })}</span>
+                    <Layers className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
+                    {!showInspector && <span className="hidden md:inline">{locale === 'en-US' ? 'Outline' : '大纲'}</span>}
+                    <span className="font-mono text-[10px]">({(transcriptData as any)?.turns?.length || 0})</span>
                   </button>
 
                   <button
                     onClick={handleCopyHandoff}
-                    className={clsx("px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5 border", t.tagBg, t.tagText, t.border)}
-                    title={tr('view.handoffBtn')}
+                    className={clsx(
+                      "h-7 px-2 sm:px-2.5 rounded-lg text-xs font-medium transition-all flex items-center space-x-1 border shrink-0 active:scale-95",
+                      t.cardBg, t.border, t.textSecondary,
+                      t.isDark ? "hover:text-indigo-300 hover:border-indigo-500/50" : "hover:text-indigo-900 hover:border-indigo-400"
+                    )}
+                    title={locale === 'en-US' ? 'Copy cross-model handoff prompt (Markdown)' : '复制跨模型任务交接提示词 (Markdown)'}
                   >
-                    <Share2 className={clsx("w-3.5 h-3.5", t.accentText)} />
-                    <span>{tr('view.handoffBtn')}</span>
+                    <Share2 className={clsx("w-3.5 h-3.5 shrink-0", t.accentText)} />
+                    {!showInspector && <span className="hidden lg:inline">{tr('view.handoffBtn')}</span>}
                   </button>
 
                   <button
                     onClick={() => setShowInspector(!showInspector)}
                     className={clsx(
-                      "p-1.5 rounded-lg text-xs transition-colors border",
+                      "h-7 w-7 rounded-lg text-xs transition-colors border flex items-center justify-center shrink-0 active:scale-95",
                       showInspector ? clsx(t.cardActiveBg, t.textPrimary, t.cardBorderActive) : clsx(t.tagBg, t.tagText, t.border)
                     )}
                     title={tr('view.toggleDrawer')}
                   >
-                    {showInspector ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+                    {showInspector ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRightOpen className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>
 
               {/* Subheader: Directory Path & Metrics */}
-              <div className={clsx("flex items-center justify-between text-[11px] pt-1 border-t", t.border, t.textMuted)}>
-                <div className="flex items-center space-x-2 truncate">
+              <div className={clsx("flex items-center justify-between text-[11px] pt-1.5 border-t gap-2 min-w-0", t.border, t.textMuted)}>
+                <div className="flex items-center space-x-2 truncate min-w-0">
                   <span className={clsx("font-mono truncate max-w-sm flex items-center gap-1.5", t.textSecondary)} title={currentSessionMeta?.directory || currentSessionMeta?.workspace}>
                     <Folder className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                    <span>{currentSessionMeta?.directory || currentSessionMeta?.workspace || (locale === 'en-US' ? 'Workspace' : '工程目录')}</span>
+                    <span className="truncate">{currentSessionMeta?.directory || currentSessionMeta?.workspace || (locale === 'en-US' ? 'Workspace' : '工程目录')}</span>
                   </span>
                   <span>•</span>
-                  <span>
+                  <span className="truncate shrink-0">
                     {locale === 'en-US' ? `Showing ${pagedMessages.length} / ${displayMessages.length} Messages` : `显示 ${pagedMessages.length} / ${displayMessages.length} 消息`}
                   </span>
                   {transcriptData && transcriptData.descendantCount > 0 && (
                     <>
                       <span>•</span>
-                      <span className={clsx("font-medium", t.accentText)}>
+                      <span className={clsx("font-medium truncate", t.accentText)}>
                         {locale === 'en-US' ? `Merged ${transcriptData.descendantCount} Subagent Tasks` : `聚合 ${transcriptData.descendantCount} 个子任务 Agent`}
                       </span>
                     </>
                   )}
                 </div>
-                <div className="flex items-center space-x-2 text-[10px] shrink-0 font-mono">
+                <div className="flex items-center space-x-1.5 text-[10px] shrink-0 font-mono">
                   <span>ID: {selectedSessionId.slice(0, 16)}...</span>
-                  <button onClick={() => copyText(selectedSessionId, 'sid')} className="hover:opacity-100">
+                  <button onClick={() => copyText(selectedSessionId, 'sid')} className="hover:opacity-100 p-0.5">
                     <Copy className="w-3 h-3" />
                   </button>
                 </div>
@@ -1248,50 +1287,52 @@ function App() {
 
             {/* In-Session Search & Filter Toolbar */}
             <div className={clsx(
-              "px-6 py-2 border-b flex items-center justify-between text-xs transition-colors",
+              "px-4 sm:px-6 py-2 border-b flex items-center justify-between text-xs transition-colors gap-2.5 flex-wrap",
               t.filterBarBg, t.border
             )}>
-              <div className="flex items-center space-x-2 w-72">
+              <div className="flex items-center space-x-2 flex-1 min-w-[140px] max-w-xs">
                 <Search className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
                 <input 
                   type="text"
                   placeholder={tr('view.searchInChat')}
                   value={inSessionSearch}
                   onChange={e => setInSessionSearch(e.target.value)}
-                  className={clsx("w-full bg-transparent placeholder-zinc-500 focus:outline-none text-xs", t.textPrimary)}
+                  className={clsx("w-full bg-transparent placeholder-zinc-500 focus:outline-none text-xs min-w-0", t.textPrimary)}
                 />
                 {inSessionSearch && (
-                  <button onClick={() => setInSessionSearch('')} className={clsx(t.textMuted, "hover:opacity-100")}>
+                  <button onClick={() => setInSessionSearch('')} className={clsx(t.textMuted, "hover:opacity-100 shrink-0")}>
                     <X className="w-3 h-3" />
                   </button>
                 )}
               </div>
 
               {/* Message Filter Segmented Control */}
-              <div className="flex items-center space-x-2 text-[11px]">
-                <span className={t.textMuted}>{locale === 'en-US' ? 'Filter:' : '过滤展示:'}</span>
-                <div className={clsx("flex items-center p-0.5 rounded-lg border", t.inputBg, t.border)}>
+              <div className="flex items-center space-x-1.5 text-[11px] shrink-0">
+                <span className={clsx("shrink-0 whitespace-nowrap text-[11px]", t.textMuted)}>
+                  {locale === 'en-US' ? 'Filter:' : '过滤:'}
+                </span>
+                <div className={clsx("flex items-center p-0.5 rounded-lg border shrink-0", t.inputBg, t.border)}>
                   <button
                     onClick={() => setMsgFilter('all')}
-                    className={clsx("px-2.5 py-0.5 rounded text-[10px] font-medium transition-colors", msgFilter === 'all' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+                    className={clsx("px-2 py-0.5 rounded text-[10.5px] font-medium transition-colors whitespace-nowrap", msgFilter === 'all' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
                   >
                     {tr('view.filterAll')} ({displayMessages.length})
                   </button>
                   <button
                     onClick={() => setMsgFilter('qa_only')}
-                    className={clsx("px-2.5 py-0.5 rounded text-[10px] font-medium transition-colors", msgFilter === 'qa_only' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+                    className={clsx("px-2 py-0.5 rounded text-[10.5px] font-medium transition-colors whitespace-nowrap", msgFilter === 'qa_only' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
                   >
                     {tr('view.filterQna')}
                   </button>
                   <button
                     onClick={() => setMsgFilter('tools_only')}
-                    className={clsx("px-2.5 py-0.5 rounded text-[10px] font-medium transition-colors", msgFilter === 'tools_only' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+                    className={clsx("px-2 py-0.5 rounded text-[10.5px] font-medium transition-colors whitespace-nowrap", msgFilter === 'tools_only' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
                   >
                     {tr('view.filterTools')}
                   </button>
                   <button
                     onClick={() => setMsgFilter('thoughts_only')}
-                    className={clsx("px-2.5 py-0.5 rounded text-[10px] font-medium transition-colors", msgFilter === 'thoughts_only' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+                    className={clsx("px-2 py-0.5 rounded text-[10.5px] font-medium transition-colors whitespace-nowrap", msgFilter === 'thoughts_only' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
                   >
                     {tr('view.filterThought')}
                   </button>
@@ -1302,11 +1343,11 @@ function App() {
             {/* Dedicated Turn Navigation Toolbar (When in card mode) */}
             {viewMode === 'card' && (transcriptData as any)?.turns && (transcriptData as any).turns.length > 0 && (
               <div className={clsx(
-                "px-6 py-2 border-b flex items-center justify-between gap-4 select-none shrink-0 transition-colors z-10",
+                "px-3 sm:px-6 py-2 border-b flex items-center justify-between gap-2 select-none shrink-0 transition-colors z-10 overflow-hidden",
                 t.filterBarBg, t.border
               )}>
                 {/* Left: Prev / Next Buttons */}
-                <div className="flex items-center space-x-2 shrink-0">
+                <div className="flex items-center space-x-1.5 shrink-0">
                   <button
                     disabled={currentTurnIndex <= 1}
                     onClick={() => {
@@ -1314,16 +1355,16 @@ function App() {
                       document.getElementById('message-feed-container')?.scrollTo({ top: 0, behavior: 'instant' })
                     }}
                     className={clsx(
-                      "h-8 px-3 rounded-lg text-xs font-medium border transition-all flex items-center space-x-1.5 shrink-0 whitespace-nowrap",
+                      "h-7 px-2 sm:px-2.5 rounded-lg text-xs font-medium border transition-all flex items-center space-x-1 shrink-0 whitespace-nowrap",
                       currentTurnIndex <= 1 
-                        ? "opacity-35 cursor-not-allowed border-zinc-800 text-zinc-600" 
-                        : clsx(t.buttonSecondary, "hover:border-zinc-600 active:scale-95")
+                        ? (t.isDark ? "opacity-35 cursor-not-allowed border-zinc-800 text-zinc-600" : "opacity-35 cursor-not-allowed border-slate-200 text-slate-400") 
+                        : clsx(t.buttonSecondary, "hover:border-indigo-500 active:scale-95")
                     )}
-                    title="上一轮 (⌥↑)"
+                    title={locale === 'en-US' ? 'Previous Turn (⌥↑)' : '上一轮 (⌥↑)'}
                   >
                     <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
-                    <span className="whitespace-nowrap">{tr('view.prevTurn')}</span>
-                    <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700/60 font-mono text-zinc-400">⌥↑</kbd>
+                    <span className="hidden sm:inline">{tr('view.prevTurn')}</span>
+                    <kbd className={clsx("text-[9px] px-1 py-0.2 rounded border font-mono hidden md:inline", t.kbdBg)}>⌥↑</kbd>
                   </button>
 
                   <button
@@ -1333,22 +1374,22 @@ function App() {
                       document.getElementById('message-feed-container')?.scrollTo({ top: 0, behavior: 'instant' })
                     }}
                     className={clsx(
-                      "h-8 px-3 rounded-lg text-xs font-medium border transition-all flex items-center space-x-1.5 shrink-0 whitespace-nowrap",
+                      "h-7 px-2 sm:px-2.5 rounded-lg text-xs font-medium border transition-all flex items-center space-x-1 shrink-0 whitespace-nowrap",
                       currentTurnIndex >= (transcriptData as any).turns.length 
-                        ? "opacity-35 cursor-not-allowed border-zinc-800 text-zinc-600" 
-                        : clsx(t.buttonSecondary, "hover:border-zinc-600 active:scale-95")
+                        ? (t.isDark ? "opacity-35 cursor-not-allowed border-zinc-800 text-zinc-600" : "opacity-35 cursor-not-allowed border-slate-200 text-slate-400") 
+                        : clsx(t.buttonSecondary, "hover:border-indigo-500 active:scale-95")
                     )}
-                    title="下一轮 (⌥↓)"
+                    title={locale === 'en-US' ? 'Next Turn (⌥↓)' : '下一轮 (⌥↓)'}
                   >
-                    <span className="whitespace-nowrap">{tr('view.nextTurn')}</span>
+                    <span className="hidden sm:inline">{tr('view.nextTurn')}</span>
                     <ChevronRight className="w-3.5 h-3.5 shrink-0" />
-                    <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700/60 font-mono text-zinc-400">⌥↓</kbd>
+                    <kbd className={clsx("text-[9px] px-1 py-0.2 rounded border font-mono hidden md:inline", t.kbdBg)}>⌥↓</kbd>
                   </button>
                 </div>
 
                 {/* Center: Jump dropdown */}
-                <div className="flex-1 min-w-0 max-w-xl relative flex items-center">
-                  <Layers className="w-3.5 h-3.5 text-zinc-400 shrink-0 ml-2.5 pointer-events-none absolute left-0" />
+                <div className="flex-1 min-w-0 max-w-sm relative flex items-center">
+                  <Layers className={clsx("w-3.5 h-3.5 shrink-0 ml-2 pointer-events-none absolute left-0", t.textMuted)} />
                   <select
                     value={currentTurnIndex}
                     onChange={(e) => {
@@ -1356,8 +1397,8 @@ function App() {
                       document.getElementById('message-feed-container')?.scrollTo({ top: 0, behavior: 'instant' })
                     }}
                     className={clsx(
-                      "w-full h-8 pl-8 pr-8 rounded-lg text-xs font-mono font-medium border outline-none cursor-pointer truncate transition-colors appearance-none",
-                      t.inputBg, t.border, t.textPrimary, "hover:border-zinc-600 focus:border-indigo-500"
+                      "w-full h-7 pl-6 pr-6 rounded-lg text-xs font-mono font-medium border outline-none cursor-pointer truncate transition-colors appearance-none",
+                      t.inputBg, t.border, t.textPrimary, "hover:border-indigo-400 focus:border-indigo-500"
                     )}
                   >
                     {((transcriptData as any).turns as ConversationTurn[]).map(turnItem => {
@@ -1365,25 +1406,26 @@ function App() {
                         .replace(/[\r\n\t]+/g, ' ')
                         .trim()
                       return (
-                        <option key={turnItem.turnIndex} value={turnItem.turnIndex} className="bg-zinc-900 text-zinc-200">
+                        <option key={turnItem.turnIndex} value={turnItem.turnIndex} className={t.isDark ? "bg-zinc-900 text-zinc-200" : "bg-white text-slate-800"}>
                           {locale === 'en-US' ? `Turn ${turnItem.turnIndex}: ` : `第 ${turnItem.turnIndex} 轮: `}{clean.slice(0, 50) || `交互 #${turnItem.turnIndex}`}{clean.length > 50 ? '...' : ''}
                         </option>
                       )
                     })}
                   </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-zinc-400 shrink-0 mr-2.5 pointer-events-none absolute right-0" />
+                  <ChevronDown className={clsx("w-3.5 h-3.5 shrink-0 mr-2 pointer-events-none absolute right-0", t.textMuted)} />
                 </div>
 
                 {/* Right: Counter */}
-                <div className="flex items-center space-x-2 text-xs shrink-0 whitespace-nowrap font-mono">
-                  <span className={clsx("px-2.5 py-1 rounded-md border text-[11px]", t.tagBg, t.tagText, t.border)}>
+                <div className="flex items-center space-x-1 text-xs shrink-0 whitespace-nowrap font-mono">
+                  <span className={clsx("px-2 py-0.5 rounded-md border text-[10.5px]", t.tagBg, t.tagText, t.border)}>
                     <strong className={clsx("font-bold", t.accentText)}>{currentTurnIndex}</strong>
-                    <span className="opacity-40 mx-1">/</span>
+                    <span className="opacity-40 mx-0.5">/</span>
                     <span>{(transcriptData as any).turns.length} {locale === 'en-US' ? 'Turns' : '轮'}</span>
                   </span>
                 </div>
               </div>
             )}
+
             
             {/* Messages Feed Area */}
             <div id="message-feed-container" className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar select-text relative">
@@ -1515,7 +1557,7 @@ function App() {
                           {/* Message Header */}
                           <div className={clsx("flex items-center justify-between space-x-3 mb-2.5 pb-2 border-b text-[10px]", t.border)}>
                             <div className="flex items-center space-x-2">
-                              <div className={clsx("p-1 rounded", isUser ? "bg-zinc-700 text-zinc-200" : "bg-zinc-800 text-zinc-400")}>
+                              <div className={clsx("p-1 rounded border", isUser ? t.roleUserBadge : t.roleAssistantBadge)}>
                                 {isUser ? <User className="w-3 h-3" /> : <Bot className="w-3 h-3" />}
                               </div>
                               <span className={clsx("font-semibold uppercase tracking-wider", t.textPrimary)}>
@@ -1525,7 +1567,7 @@ function App() {
                               {m.is_subagent && (
                                 <span className={clsx("inline-flex items-center space-x-1 px-1.5 py-0.5 rounded border text-[9px] font-medium", t.tagBg, t.tagText, t.border)} title={m.subagent_title}>
                                   <GitFork className={clsx("w-2.5 h-2.5", t.accentText)} />
-                                  <span className="truncate max-w-[200px]">{m.subagent_title || '子任务'}</span>
+                                  <span className="truncate max-w-[200px]">{m.subagent_title || (locale === 'en-US' ? 'Subagent' : '子任务')}</span>
                                 </span>
                               )}
                             </div>
@@ -1536,7 +1578,7 @@ function App() {
                               <button
                                 onClick={() => copyText(content, m.id)}
                                 className={clsx("p-0.5 rounded transition-colors hover:opacity-100", t.textMuted)}
-                                title="复制内容"
+                                title={locale === 'en-US' ? 'Copy Content' : '复制内容'}
                               >
                                 {copiedId === m.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                               </button>
@@ -1552,7 +1594,7 @@ function App() {
                               >
                                 <div className="flex items-center space-x-1.5">
                                   <Sparkles className={clsx("w-3 h-3", t.accentText)} />
-                                  <span>模型思考过程 ({thought.length} 字符)</span>
+                                  <span>{locale === 'en-US' ? `Thinking Process (${thought.length} chars)` : `模型思考过程 (${thought.length} 字符)`}</span>
                                 </div>
                                 <ChevronDown className={clsx("w-3 h-3 transition-transform opacity-60", isThoughtOpen && "rotate-180")} />
                               </button>
@@ -1573,7 +1615,7 @@ function App() {
                               >
                                 <div className="flex items-center space-x-1.5">
                                   <Terminal className={clsx("w-3 h-3", t.accentText)} />
-                                  <span>工具调用日志 ({toolParts.length} 次)</span>
+                                  <span>{locale === 'en-US' ? `Tool Execution Logs (${toolParts.length})` : `工具调用日志 (${toolParts.length} 次)`}</span>
                                 </div>
                                 <ChevronDown className={clsx("w-3 h-3 transition-transform opacity-60", isToolOpen && "rotate-180")} />
                               </button>
@@ -1618,6 +1660,7 @@ function App() {
                                       content={sanitized.cleanText || (locale === 'en-US' ? '(Empty user prompt)' : '(空用户指令)')}
                                       workspacePath={currentSessionMeta?.directory || currentSessionMeta?.workspace}
                                       theme={effectiveTheme}
+                                      locale={locale}
                                       onPreviewFile={handlePreviewFile}
                                       onImageClick={(src, alt) => {
                                         setPreviewModalData({
@@ -1688,6 +1731,7 @@ function App() {
                                   content={content}
                                   workspacePath={currentSessionMeta?.directory || currentSessionMeta?.workspace}
                                   theme={effectiveTheme}
+                                  locale={locale}
                                   onPreviewFile={handlePreviewFile}
                                   onImageClick={(src, alt) => {
                                     setPreviewModalData({
@@ -1792,57 +1836,62 @@ function App() {
       {/* Pane 3: Right Inspector Drawer (会话资产与跨模型交接工坊) */}
       {showInspector && selectedSessionId && (
         <div className={clsx(
-          "w-[380px] border-l flex flex-col shrink-0 animate-in slide-in-from-right-3 duration-200 transition-colors",
+          "w-[330px] xl:w-[380px] border-l flex flex-col shrink-0 animate-in slide-in-from-right-3 duration-200 transition-colors",
           t.sidebarBg, t.border
         )}>
           {/* Drawer Header */}
           <div className={clsx(
-            "p-3.5 border-b flex items-center justify-between transition-colors",
+            "p-3.5 border-b flex items-center justify-between transition-colors min-w-0",
             t.sidebarHeaderBg, t.border
           )}>
-            <div className="flex items-center space-x-2">
-              <Wrench className={clsx("w-4 h-4", t.accentText)} />
-              <h3 className={clsx("text-xs font-semibold", t.textPrimary)}>
+            <div className="flex items-center space-x-2 min-w-0 pr-2">
+              <Wrench className={clsx("w-4 h-4 shrink-0", t.accentText)} />
+              <h3 className={clsx("text-xs font-semibold truncate", t.textPrimary)} title={tr('handoff.title')}>
                 {tr('handoff.title')}
               </h3>
             </div>
             <button 
               onClick={() => setShowInspector(false)}
-              className={clsx("p-1 rounded hover:opacity-100", t.textMuted)}
+              className={clsx("p-1 rounded hover:opacity-100 shrink-0", t.textMuted)}
+              title={locale === 'en-US' ? 'Close Drawer' : '收起抽屉'}
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {/* Drawer Tabs */}
-          <div className={clsx("grid grid-cols-4 p-1 border-b text-[10px] font-medium transition-colors", t.filterBarBg, t.border)}>
+          <div className={clsx("grid grid-cols-4 p-1 border-b text-[10px] font-medium transition-colors gap-0.5", t.filterBarBg, t.border)}>
             <button
               onClick={() => setInspectorTab('handoff')}
-              className={clsx("py-1.5 rounded transition-colors flex items-center justify-center gap-1", inspectorTab === 'handoff' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+              className={clsx("py-1.5 px-1 rounded transition-colors flex items-center justify-center gap-1 min-w-0", inspectorTab === 'handoff' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+              title={locale === 'en-US' ? 'Context Handoff' : '上下文交接'}
             >
-              <ArrowRightLeft className="w-3 h-3" />
-              <span>{tr('handoff.tabHandoff')}</span>
+              <ArrowRightLeft className="w-3 h-3 shrink-0" />
+              <span className="truncate">{tr('handoff.tabHandoff')}</span>
             </button>
             <button
               onClick={() => setInspectorTab('files')}
-              className={clsx("py-1.5 rounded transition-colors flex items-center justify-center gap-1", inspectorTab === 'files' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+              className={clsx("py-1.5 px-1 rounded transition-colors flex items-center justify-center gap-1 min-w-0", inspectorTab === 'files' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+              title={locale === 'en-US' ? `Modified Files (${analytics?.modifiedFiles.length || 0})` : `变更文件 (${analytics?.modifiedFiles.length || 0})`}
             >
-              <FileCode className="w-3 h-3" />
-              <span>{tr('handoff.tabFiles', { count: String(analytics?.modifiedFiles.length || 0) })}</span>
+              <FileCode className="w-3 h-3 shrink-0" />
+              <span className="truncate">{tr('handoff.tabFiles', { count: String(analytics?.modifiedFiles.length || 0) })}</span>
             </button>
             <button
               onClick={() => setInspectorTab('tools')}
-              className={clsx("py-1.5 rounded transition-colors flex items-center justify-center gap-1", inspectorTab === 'tools' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+              className={clsx("py-1.5 px-1 rounded transition-colors flex items-center justify-center gap-1 min-w-0", inspectorTab === 'tools' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+              title={locale === 'en-US' ? 'Tool Statistics' : '工具统计'}
             >
-              <Terminal className="w-3 h-3" />
-              <span>{tr('handoff.tabTools')}</span>
+              <Terminal className="w-3 h-3 shrink-0" />
+              <span className="truncate">{tr('handoff.tabTools')}</span>
             </button>
             <button
               onClick={() => setInspectorTab('export')}
-              className={clsx("py-1.5 rounded transition-colors flex items-center justify-center gap-1", inspectorTab === 'export' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+              className={clsx("py-1.5 px-1 rounded transition-colors flex items-center justify-center gap-1 min-w-0", inspectorTab === 'export' ? clsx(t.cardActiveBg, t.textPrimary) : t.textMuted)}
+              title={locale === 'en-US' ? 'Data Export' : '数据导出'}
             >
-              <Download className="w-3 h-3" />
-              <span>{tr('handoff.tabExport')}</span>
+              <Download className="w-3 h-3 shrink-0" />
+              <span className="truncate">{tr('handoff.tabExport')}</span>
             </button>
           </div>
 
@@ -1970,10 +2019,12 @@ function App() {
                       <Terminal className="w-4 h-4 text-sky-400" />
                       <span className={t.textPrimary}>OpenCode (.opencode.json)</span>
                     </span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 font-mono">官方原生格式</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 font-mono">
+                      {locale === 'en-US' ? 'Official Format' : '官方原生格式'}
+                    </span>
                   </div>
                   <p className={clsx("text-[11px] leading-relaxed", t.textSecondary)}>
-                    专为 OpenCode CLI 打造的原生导入结构，包含 info、messages、parts 标准规范。
+                    {locale === 'en-US' ? 'Native OpenCode CLI format with standard info, messages, and parts schema.' : '专为 OpenCode CLI 打造的原生导入结构，包含 info、messages、parts 标准规范。'}
                   </p>
                   <div className="flex items-center space-x-2 pt-1">
                     <button
@@ -2000,10 +2051,12 @@ function App() {
                       <Code className="w-4 h-4 text-emerald-400" />
                       <span className={t.textPrimary}>Codex / Copilot CLI (.codex.json)</span>
                     </span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono">Codex 格式</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono">
+                      {locale === 'en-US' ? 'Codex Format' : 'Codex 格式'}
+                    </span>
                   </div>
                   <p className={clsx("text-[11px] leading-relaxed", t.textSecondary)}>
-                    针对 OpenAI Codex 及 GitHub Copilot 场景优化，携带元数据、触达文件与执行回执。
+                    {locale === 'en-US' ? 'Optimized for OpenAI Codex & Copilot CLI scenarios with execution receipts.' : '针对 OpenAI Codex 及 GitHub Copilot 场景优化，携带元数据、触达文件与执行回执。'}
                   </p>
                   <div className="flex items-center space-x-2 pt-1">
                     <button
@@ -2028,12 +2081,14 @@ function App() {
                   <div className="flex items-center justify-between font-semibold">
                     <span className="flex items-center space-x-1.5">
                       <Send className="w-4 h-4 text-rose-400" />
-                      <span className={t.textPrimary}>Pi.ai 对话格式 (.pi.json)</span>
+                      <span className={t.textPrimary}>{locale === 'en-US' ? 'Pi.ai Session (.pi.json)' : 'Pi.ai 对话格式 (.pi.json)'}</span>
                     </span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 font-mono">Pi 专属</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 font-mono">
+                      {locale === 'en-US' ? 'Pi Exclusive' : 'Pi 专属'}
+                    </span>
                   </div>
                   <p className={clsx("text-[11px] leading-relaxed", t.textSecondary)}>
-                    适配 Inflection Pi / Pi.ai 的对话轮次与内部思考流规范，纯净自然。
+                    {locale === 'en-US' ? 'Adapted for Inflection Pi / Pi.ai turn structure and natural inner thought streams.' : '适配 Inflection Pi / Pi.ai 的对话轮次与内部思考流规范，纯净自然。'}
                   </p>
                   <div className="flex items-center space-x-2 pt-1">
                     <button
@@ -2060,10 +2115,12 @@ function App() {
                       <Cpu className="w-4 h-4 text-amber-400" />
                       <span className={t.textPrimary}>Claude Code (.claude.json)</span>
                     </span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-mono">Claude 格式</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-mono">
+                      {locale === 'en-US' ? 'Claude Format' : 'Claude 格式'}
+                    </span>
                   </div>
                   <p className={clsx("text-[11px] leading-relaxed", t.textSecondary)}>
-                    适配 Anthropic Claude Code 工具链，保留上下文、思考过程和工具调用。
+                    {locale === 'en-US' ? 'Adapted for Anthropic Claude Code toolchains with context, thinking, and tool execution.' : '适配 Anthropic Claude Code 工具链，保留上下文、思考过程和工具调用。'}
                   </p>
                   <div className="flex items-center space-x-2 pt-1">
                     <button
@@ -2088,12 +2145,12 @@ function App() {
                   <div className="flex items-center justify-between font-semibold">
                     <span className="flex items-center space-x-1.5">
                       <Sparkles className="w-4 h-4 text-purple-400" />
-                      <span className={t.textPrimary}>反重力 (transcript.jsonl)</span>
+                      <span className={t.textPrimary}>{locale === 'en-US' ? 'Antigravity (transcript.jsonl)' : '反重力 (transcript.jsonl)'}</span>
                     </span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 font-mono">Antigravity</span>
                   </div>
                   <p className={clsx("text-[11px] leading-relaxed", t.textSecondary)}>
-                    对齐 Antigravity 记忆系统的原生 JSON Lines 轨迹格式，支持 step_index 与 tool_calls。
+                    {locale === 'en-US' ? 'Aligned with Antigravity memory system native JSON Lines trajectory with step_index and tool_calls.' : '对齐 Antigravity 记忆系统的原生 JSON Lines 轨迹格式，支持 step_index 与 tool_calls。'}
                   </p>
                   <div className="flex items-center space-x-2 pt-1">
                     <button
@@ -2118,12 +2175,14 @@ function App() {
                   <div className="flex items-center justify-between font-semibold">
                     <span className="flex items-center space-x-1.5">
                       <FileText className="w-4 h-4 text-zinc-400" />
-                      <span className={t.textPrimary}>Markdown 文档 (.md)</span>
+                      <span className={t.textPrimary}>{locale === 'en-US' ? 'Markdown Document (.md)' : 'Markdown 文档 (.md)'}</span>
                     </span>
-                    <span className={clsx("text-[9px] px-1.5 py-0.5 rounded font-mono", t.tagBg, t.tagText)}>人类可读</span>
+                    <span className={clsx("text-[9px] px-1.5 py-0.5 rounded font-mono", t.tagBg, t.tagText)}>
+                      {locale === 'en-US' ? 'Human Readable' : '人类可读'}
+                    </span>
                   </div>
                   <p className={clsx("text-[11px] leading-relaxed", t.textSecondary)}>
-                    整洁排版的纯 Markdown 文档，内嵌修改文件列表、工具回执与思考折叠块。
+                    {locale === 'en-US' ? 'Clean structured Markdown document with embedded modified files, tool receipts, and thinking blocks.' : '整洁排版的纯 Markdown 文档，内嵌修改文件列表、工具回执与思考折叠块。'}
                   </p>
                   <div className="flex items-center space-x-2 pt-1">
                     <button

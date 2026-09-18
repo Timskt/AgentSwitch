@@ -4,7 +4,7 @@ import {
   ExternalLink, Download, FolderOpen, Shield, Bell, CheckCircle2, Info, Languages, SunMoon
 } from 'lucide-react'
 import clsx from 'clsx'
-import { AppThemeMode } from '../theme'
+import { AppTheme, AppThemeMode, THEME_STYLES } from '../theme'
 import { translations, Locale } from '../i18n'
 
 interface SettingsModalProps {
@@ -19,6 +19,7 @@ interface SettingsModalProps {
   dbPath?: string
   onSelectCustomDb: () => void
   onRefreshDb: () => void
+  theme?: AppTheme
 }
 
 export function SettingsModal({
@@ -32,7 +33,8 @@ export function SettingsModal({
   onFontSizeChange,
   dbPath,
   onSelectCustomDb,
-  onRefreshDb
+  onRefreshDb,
+  theme = 'obsidian'
 }: SettingsModalProps) {
   const [tab, setTab] = useState<'appearance' | 'language' | 'database' | 'update' | 'about'>('appearance')
   const [checkingUpdate, setCheckingUpdate] = useState(false)
@@ -40,6 +42,8 @@ export function SettingsModal({
   const [autoCheckUpdate, setAutoCheckUpdate] = useState(true)
 
   const t = translations[locale]?.settings || translations['zh-CN'].settings
+  const themeStyle = THEME_STYLES[theme] || THEME_STYLES.obsidian
+  const isDark = themeStyle.isDark
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -109,72 +113,65 @@ export function SettingsModal({
   return (
     <div 
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in"
+      className={clsx("fixed inset-0 z-50 flex items-center justify-center p-6 animate-in fade-in", themeStyle.modalBackdropBg || "bg-black/75 backdrop-blur-sm")}
     >
       <div 
         onClick={e => e.stopPropagation()}
-        className="bg-[#121215] border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden"
+        className={clsx("border rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden", themeStyle.modalBg)}
       >
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-[#18181b]">
+        <div className={clsx("px-6 py-4 border-b flex items-center justify-between", themeStyle.modalHeaderBg)}>
           <div className="flex items-center space-x-2.5">
-            <Palette className="w-4 h-4 text-indigo-400" />
-            <h2 className="text-sm font-semibold text-zinc-100">{t.title}</h2>
+            <Palette className="w-4 h-4 text-indigo-500" />
+            <h2 className={clsx("text-sm font-semibold", themeStyle.textPrimary)}>{t.title}</h2>
           </div>
           <button 
             onClick={onClose}
-            className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-200 transition-colors"
+            className={clsx("p-1 rounded transition-colors", themeStyle.buttonGhost)}
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Tabs Bar */}
-        <div className="flex border-b border-zinc-800 bg-zinc-900 px-6 space-x-6 text-xs font-medium overflow-x-auto">
-          <button
-            onClick={() => setTab('appearance')}
-            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5 shrink-0", tab === 'appearance' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
-          >
-            <Palette className="w-3.5 h-3.5" />
-            <span>{t.tabAppearance}</span>
-          </button>
-          <button
-            onClick={() => setTab('language')}
-            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5 shrink-0", tab === 'language' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
-          >
-            <Languages className="w-3.5 h-3.5" />
-            <span>{t.tabLanguage}</span>
-          </button>
-          <button
-            onClick={() => setTab('database')}
-            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5 shrink-0", tab === 'database' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
-          >
-            <Database className="w-3.5 h-3.5" />
-            <span>{t.tabDatabase}</span>
-          </button>
-          <button
-            onClick={() => setTab('update')}
-            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5 shrink-0", tab === 'update' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>{t.tabUpdate}</span>
-          </button>
-          <button
-            onClick={() => setTab('about')}
-            className={clsx("py-2.5 border-b-2 transition-colors flex items-center gap-1.5 shrink-0", tab === 'about' ? "border-indigo-500 text-zinc-100" : "border-transparent text-zinc-400 hover:text-zinc-200")}
-          >
-            <Info className="w-3.5 h-3.5" />
-            <span>{t.tabAbout}</span>
-          </button>
+        <div className={clsx(
+          "flex border-b px-6 space-x-6 text-xs font-medium overflow-x-auto",
+          themeStyle.border,
+          isDark ? "bg-zinc-900" : "bg-slate-100/70"
+        )}>
+          {[
+            { id: 'appearance', label: t.tabAppearance, icon: <Palette className="w-3.5 h-3.5" /> },
+            { id: 'language', label: t.tabLanguage, icon: <Languages className="w-3.5 h-3.5" /> },
+            { id: 'database', label: t.tabDatabase, icon: <Database className="w-3.5 h-3.5" /> },
+            { id: 'update', label: t.tabUpdate, icon: <RefreshCw className="w-3.5 h-3.5" /> },
+            { id: 'about', label: t.tabAbout, icon: <Info className="w-3.5 h-3.5" /> },
+          ].map(tb => {
+            const isActive = tab === tb.id
+            return (
+              <button
+                key={tb.id}
+                onClick={() => setTab(tb.id as any)}
+                className={clsx(
+                  "py-2.5 border-b-2 transition-colors flex items-center gap-1.5 shrink-0",
+                  isActive 
+                    ? (isDark ? "border-indigo-500 text-zinc-100 font-semibold" : "border-indigo-600 text-indigo-700 font-semibold")
+                    : (isDark ? "border-transparent text-zinc-400 hover:text-zinc-200" : "border-transparent text-slate-500 hover:text-slate-900")
+                )}
+              >
+                {tb.icon}
+                <span>{tb.label}</span>
+              </button>
+            )
+          })}
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs custom-scrollbar">
+        <div className={clsx("flex-1 overflow-y-auto p-6 space-y-6 text-xs custom-scrollbar", isDark ? "bg-[#121215]" : "bg-white")}>
           {/* Tab 1: Appearance */}
           {tab === 'appearance' && (
             <div className="space-y-5">
               <div>
-                <label className="text-xs font-semibold text-zinc-200 block mb-2">{t.themeTitle}</label>
+                <label className={clsx("text-xs font-semibold block mb-2", themeStyle.textPrimary)}>{t.themeTitle}</label>
                 <div className="grid grid-cols-2 gap-3">
                   {themes.map(tm => {
                     const isSelected = currentThemeMode === tm.id
@@ -185,14 +182,14 @@ export function SettingsModal({
                         className={clsx(
                           "p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-2 relative overflow-hidden group",
                           isSelected 
-                            ? "bg-zinc-800/90 border-indigo-500 shadow-md ring-1 ring-indigo-500/50" 
-                            : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700"
+                            ? (isDark ? "bg-zinc-800/90 border-indigo-500 shadow-md ring-1 ring-indigo-500/50" : "bg-indigo-50/70 border-indigo-500 shadow-sm ring-1 ring-indigo-500/30") 
+                            : (isDark ? "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700" : "bg-white border-slate-200 hover:border-slate-300 shadow-2xs")
                         )}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
                             {tm.icon || <div className={clsx("w-3.5 h-3.5 rounded-full border", tm.bg, tm.border)} />}
-                            <span className="font-medium text-zinc-100">{tm.name}</span>
+                            <span className={clsx("font-medium", themeStyle.textPrimary)}>{tm.name}</span>
                           </div>
                           {isSelected && (
                             <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">
@@ -200,15 +197,15 @@ export function SettingsModal({
                             </div>
                           )}
                         </div>
-                        <p className="text-[11px] text-zinc-400 leading-relaxed">{tm.desc}</p>
+                        <p className={clsx("text-[11px] leading-relaxed", themeStyle.textMuted)}>{tm.desc}</p>
                       </div>
                     )
                   })}
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-zinc-800/80">
-                <label className="text-xs font-semibold text-zinc-200 block mb-2">{t.fontSizeTitle}</label>
+              <div className={clsx("pt-2 border-t", themeStyle.border)}>
+                <label className={clsx("text-xs font-semibold block mb-2", themeStyle.textPrimary)}>{t.fontSizeTitle}</label>
                 <div className="flex items-center space-x-3">
                   {[
                     { size: 12, label: t.fontSmall },
@@ -222,7 +219,7 @@ export function SettingsModal({
                         "px-4 py-2 rounded-lg border text-xs font-medium transition-all",
                         fontSize === f.size 
                           ? "bg-indigo-600 text-white border-indigo-500 shadow-sm" 
-                          : "bg-zinc-900 text-zinc-300 border-zinc-800 hover:border-zinc-700"
+                          : themeStyle.buttonSecondary
                       )}
                     >
                       {f.label}
@@ -237,8 +234,8 @@ export function SettingsModal({
           {tab === 'language' && (
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-zinc-200 block mb-1">{t.languageTitle}</label>
-                <p className="text-xs text-zinc-400 mb-4">{t.languageDesc}</p>
+                <label className={clsx("text-xs font-semibold block mb-1", themeStyle.textPrimary)}>{t.languageTitle}</label>
+                <p className={clsx("text-xs mb-4", themeStyle.textMuted)}>{t.languageDesc}</p>
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     { id: 'zh-CN' as Locale, label: t.langZh },
@@ -252,11 +249,11 @@ export function SettingsModal({
                         className={clsx(
                           "p-4 rounded-xl border transition-all text-left flex items-center justify-between",
                           isSelected 
-                            ? "bg-zinc-800/90 border-indigo-500 shadow-md ring-1 ring-indigo-500/50" 
-                            : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-300"
+                            ? (isDark ? "bg-zinc-800/90 border-indigo-500 shadow-md ring-1 ring-indigo-500/50" : "bg-indigo-50/70 border-indigo-500 shadow-sm ring-1 ring-indigo-500/30") 
+                            : (isDark ? "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700 text-zinc-300" : "bg-white border-slate-200 hover:border-slate-300 text-slate-800 shadow-2xs")
                         )}
                       >
-                        <span className="font-semibold text-xs text-zinc-100">{l.label}</span>
+                        <span className={clsx("font-semibold text-xs", themeStyle.textPrimary)}>{l.label}</span>
                         {isSelected && (
                           <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">
                             <Check className="w-2.5 h-2.5 stroke-[3]" />
@@ -274,9 +271,9 @@ export function SettingsModal({
           {tab === 'database' && (
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-zinc-200 block mb-1">{t.dbTitle}</label>
-                <p className="text-xs text-zinc-400 mb-3">{t.dbDesc}</p>
-                <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-mono text-zinc-300 break-all select-all flex items-center justify-between">
+                <label className={clsx("text-xs font-semibold block mb-1", themeStyle.textPrimary)}>{t.dbTitle}</label>
+                <p className={clsx("text-xs mb-3", themeStyle.textMuted)}>{t.dbDesc}</p>
+                <div className={clsx("p-3 border rounded-lg text-xs font-mono break-all select-all flex items-center justify-between", isDark ? "bg-zinc-900 border-zinc-800 text-zinc-300" : "bg-slate-50 border-slate-200 text-slate-700")}>
                   <span>{dbPath || '~/.local/share/opencode, ~/.codex, ~/.gemini/antigravity'}</span>
                 </div>
               </div>
@@ -284,17 +281,17 @@ export function SettingsModal({
               <div className="flex items-center space-x-3 pt-2">
                 <button
                   onClick={onSelectCustomDb}
-                  className="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-lg font-medium transition-colors flex items-center space-x-2"
+                  className={clsx("px-3.5 py-2 border rounded-lg font-medium transition-colors flex items-center space-x-2", themeStyle.buttonSecondary)}
                 >
-                  <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />
+                  <FolderOpen className={clsx("w-3.5 h-3.5", themeStyle.textMuted)} />
                   <span>{t.customDbBtn}</span>
                 </button>
 
                 <button
                   onClick={onRefreshDb}
-                  className="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-lg font-medium transition-colors flex items-center space-x-2"
+                  className={clsx("px-3.5 py-2 border rounded-lg font-medium transition-colors flex items-center space-x-2", themeStyle.buttonSecondary)}
                 >
-                  <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
+                  <RefreshCw className={clsx("w-3.5 h-3.5", themeStyle.textMuted)} />
                   <span>{t.refreshDbBtn}</span>
                 </button>
               </div>
@@ -305,12 +302,12 @@ export function SettingsModal({
           {tab === 'update' && (
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-zinc-200 block mb-1">{t.updateTitle}</label>
-                <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
+                <label className={clsx("text-xs font-semibold block mb-1", themeStyle.textPrimary)}>{t.updateTitle}</label>
+                <div className={clsx("p-4 border rounded-xl space-y-3", isDark ? "bg-zinc-900 border-zinc-800" : "bg-slate-50 border-slate-200")}>
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-semibold text-zinc-200 text-xs">AgentSwitch v2.6.0</div>
-                      <div className="text-[11px] text-zinc-500">Release: 2026-09-18</div>
+                      <div className={clsx("font-semibold text-xs", themeStyle.textPrimary)}>AgentSwitch v2.6.0</div>
+                      <div className={clsx("text-[11px]", themeStyle.textMuted)}>Release: 2026-09-18</div>
                     </div>
                     <button
                       onClick={handleCheckUpdate}
@@ -323,7 +320,7 @@ export function SettingsModal({
                   </div>
 
                   {updateResult && (
-                    <div className="p-3 bg-zinc-950/80 rounded-lg border border-emerald-900/40 text-emerald-400 flex items-center space-x-2">
+                    <div className={clsx("p-3 rounded-lg border flex items-center space-x-2", isDark ? "bg-zinc-950/80 border-emerald-900/40 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-700")}>
                       <CheckCircle2 className="w-4 h-4 shrink-0" />
                       <span>{t.latestVersion.replace('{version}', 'v2.6.0')}</span>
                     </div>
@@ -331,13 +328,13 @@ export function SettingsModal({
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2 text-xs text-zinc-400 pt-1">
+              <div className={clsx("flex items-center space-x-2 text-xs pt-1", themeStyle.textSecondary)}>
                 <input 
                   type="checkbox" 
                   id="autoCheck"
                   checked={autoCheckUpdate} 
                   onChange={e => setAutoCheckUpdate(e.target.checked)}
-                  className="rounded border-zinc-700 bg-zinc-800 text-indigo-600 focus:ring-0"
+                  className="rounded border-slate-300 text-indigo-600 focus:ring-0"
                 />
                 <label htmlFor="autoCheck" className="cursor-pointer select-none">{t.autoCheckLabel}</label>
               </div>
@@ -347,33 +344,33 @@ export function SettingsModal({
           {/* Tab 5: About */}
           {tab === 'about' && (
             <div className="space-y-4">
-              <div className="p-5 bg-zinc-900 border border-zinc-800 rounded-xl space-y-3">
+              <div className={clsx("p-5 border rounded-xl space-y-3", isDark ? "bg-zinc-900 border-zinc-800" : "bg-slate-50 border-slate-200")}>
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
                     AS
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-zinc-100">{t.aboutTitle}</h3>
-                    <p className="text-[11px] text-zinc-400">{t.aboutDesc}</p>
+                    <h3 className={clsx("text-sm font-bold", themeStyle.textPrimary)}>{t.aboutTitle}</h3>
+                    <p className={clsx("text-[11px]", themeStyle.textMuted)}>{t.aboutDesc}</p>
                   </div>
                 </div>
 
-                <div className="border-t border-zinc-800 pt-3 space-y-1.5 text-[11px] text-zinc-400 font-mono">
+                <div className={clsx("border-t pt-3 space-y-1.5 text-[11px] font-mono", themeStyle.border)}>
                   <div className="flex justify-between">
-                    <span>{t.version}:</span>
-                    <span className="text-zinc-200">v2.6.0 (Build 2026.09.18)</span>
+                    <span className={themeStyle.textMuted}>{t.version}:</span>
+                    <span className={themeStyle.textPrimary}>v2.6.0 (Build 2026.09.18)</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Electron:</span>
-                    <span className="text-zinc-200">v39.2.6</span>
+                    <span className={themeStyle.textMuted}>Electron:</span>
+                    <span className={themeStyle.textPrimary}>v39.2.6</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>React:</span>
-                    <span className="text-zinc-200">v19.2.1 (Vite v7.2.6)</span>
+                    <span className={themeStyle.textMuted}>React:</span>
+                    <span className={themeStyle.textPrimary}>v19.2.1 (Vite v7.2.6)</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>{t.license}:</span>
-                    <span className="text-zinc-200">MIT Open Source</span>
+                    <span className={themeStyle.textMuted}>{t.license}:</span>
+                    <span className={themeStyle.textPrimary}>MIT Open Source</span>
                   </div>
                 </div>
               </div>
